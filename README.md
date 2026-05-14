@@ -5,6 +5,10 @@
 **The Flexibility Trap: Why Arbitrary Order Limits Reasoning Potential in Diffusion Language Models**
 
 <p align="center">
+  <i>🌟 ICML 2026 Spotlight 🌟</i>
+</p>
+
+<p align="center">
     <a href="https://nzl-thu.github.io/">Zanlin Ni<sup>1</sup></a> &emsp;
     <a href="https://scholar.google.com/citations?user=Xgt7njgAAAAJ&hl=zh-CN">Shenzhi Wang<sup>1</sup></a> &emsp;
     <a href="https://yueyang130.github.io/">Yang Yue<sup>1</sup></a> &emsp;
@@ -27,6 +31,8 @@
     <sup>4</sup>Alibaba Group
 </p>
 
+
+
 [![Project](https://img.shields.io/badge/🌐%20Project-Page-green)](https://nzl-thu.github.io/the-flexibility-trap/)
 [![arXiv](https://img.shields.io/badge/arXiv-2601.15165-b31b1b.svg)](https://arxiv.org/abs/2601.15165)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -40,7 +46,7 @@
 
 ## 📢 News
 
-
+- **[2026.05]** 🌟 Our paper is accepted as a Spotlight at ICML 2026!
 - **[2026.03]** 🎉 Training code, evaluation scripts, and model checkpoints for MATH-500, HumanEval and MBPP datasets released!
 - **[2026.01]** 📄 Paper available on [arXiv](https://arxiv.org/abs/2601.15165)!
 - **[2026.01]** 🎉 Training code, evaluation scripts, and [model checkpoint](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO) on GSM8K released!
