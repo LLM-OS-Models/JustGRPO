@@ -5,7 +5,7 @@
 **The Flexibility Trap: Why Arbitrary Order Limits Reasoning Potential in Diffusion Language Models**
 
 <p align="center">
-  <i>🌟 ICML 2026 Spotlight 🌟</i>
+  <i>🌟 ICML 2026 Oral 🌟</i>
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@
 
 ## 📢 News
 
-- **[2026.05]** 🌟 Our paper is accepted as a Spotlight at ICML 2026!
+- **[2026.05]** 🌟 Our paper is accepted as a Oral at ICML 2026!
 - **[2026.03]** 🎉 Training code, evaluation scripts, and model checkpoints for MATH-500, HumanEval and MBPP datasets released!
 - **[2026.01]** 📄 Paper available on [arXiv](https://arxiv.org/abs/2601.15165)!
 - **[2026.01]** 🎉 Training code, evaluation scripts, and [model checkpoint](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO) on GSM8K released!
