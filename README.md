@@ -46,7 +46,7 @@
 
 ## 📢 News
 
-- **[2026.05]** 🌟 Our paper is accepted as a Oral at ICML 2026!
+- **[2026.05]** 🌟 Our paper is accepted as an Oral at ICML 2026!
 - **[2026.03]** 🎉 Training code, evaluation scripts, and model checkpoints for MATH-500, HumanEval and MBPP datasets released!
 - **[2026.01]** 📄 Paper available on [arXiv](https://arxiv.org/abs/2601.15165)!
 - **[2026.01]** 🎉 Training code, evaluation scripts, and [model checkpoint](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO) on GSM8K released!
