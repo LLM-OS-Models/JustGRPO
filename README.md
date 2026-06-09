@@ -2,7 +2,7 @@
 
 # JustGRPO
 
-**The Flexibility Trap: Why Arbitrary Order Limits Reasoning Potential in Diffusion Language Models**
+**The Flexibility Trap: Rethinking the Value of Arbitrary Order in Diffusion Language Models**
 
 <p align="center">
   <i>🌟 ICML 2026 Oral 🌟</i>
@@ -167,10 +167,10 @@ accelerate launch --num_processes 8 --config_file configs/fsdp.yaml train.py \
 If you find this work useful, please consider citing our paper.
 
 ```bibtex
-@article{ni2026flexibility,
-  title={The Flexibility Trap: Why Arbitrary Order Limits Reasoning Potential in Diffusion Language Models},
+@inproceedings{ni2026flexibility,
+  title={The Flexibility Trap: Rethinking the Value of Arbitrary Order in Diffusion Language Models},
   author={Ni, Zanlin and Wang, Shenzhi and Yue, Yang and Yu, Tianyu and Zhao, Weilin and Hua, Yeguo and Chen, Tianyi and Song, Jun and Yu, Cheng and Zheng, Bo and Huang, Gao},
-  journal={arXiv preprint arXiv:2601.15165},
+  booktitle={ICML},
   year={2026}
 }
 ```
