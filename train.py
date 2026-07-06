@@ -30,6 +30,12 @@ class TrainConfig:
     gen_steps: int = 256
     gen_length: int = 256
 
+    # --- LoRA ---
+    lora: bool = False
+    lora_r: int = 128
+    lora_alpha: int = 64
+    lora_dropout: float = 0.05
+
     # --- Misc ---
     output_dir: str = "./checkpoints"
     log_every: int = 1
@@ -73,6 +79,16 @@ def train(config: TrainConfig):
     # Activation checkpointing
     if hasattr(model, 'model') and hasattr(model.model, 'set_activation_checkpointing'):
         model.model.set_activation_checkpointing('whole_layer')
+
+    # LoRA option
+    if config.lora:
+        from peft import LoraConfig, get_peft_model
+        model = get_peft_model(model, LoraConfig(
+            r=config.lora_r, lora_alpha=config.lora_alpha, lora_dropout=config.lora_dropout,
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"],
+            task_type="CAUSAL_LM",
+        ))
+        model.print_trainable_parameters()
 
     # --- Tokenizer ---
     tokenizer = AutoTokenizer.from_pretrained(config.model_path)
@@ -246,9 +262,12 @@ def parse_args():
 
     parser.add_argument("--run_dir", type=str, default="./checkpoints", help="Output directory")
     parser.add_argument("--grad_accum", type=int, default=8, help="Gradient accumulation steps")
+    parser.add_argument("--total_steps", type=int, default=125, help="Total training steps (125 for full finetuning, 200 for LoRA)")
     parser.add_argument("--resume_ckpt", type=str, default=None, help="Resume checkpoint path")
     parser.add_argument("--dataset", type=str, default="gsm8k", help="Dataset: gsm8k, math, code")
     parser.add_argument("--code_data_path", type=str, default=None, help="Path to code training data")
+    parser.add_argument("--lora", action="store_true", help="Train LoRA adapters instead of full finetuning")
+    parser.add_argument("--lr", type=float, default=None, help="Learning rate (default: 5e-5 with --lora, 5e-6 otherwise)")
 
     return parser.parse_args()
 
@@ -259,9 +278,12 @@ if __name__ == "__main__":
     config = TrainConfig(
         output_dir=args.run_dir,
         grad_accumulation=args.grad_accum,
+        total_steps=args.total_steps,
         resume_ckpt=args.resume_ckpt,
         dataset=args.dataset,
         code_data_path=args.code_data_path,
+        lora=args.lora,
+        learning_rate=args.lr if args.lr is not None else (5e-5 if args.lora else 5e-6),
     )
 
     train(config)

@@ -5,7 +5,7 @@
 **The Flexibility Trap: Rethinking the Value of Arbitrary Order in Diffusion Language Models**
 
 <p align="center">
-  <i>🌟 ICML 2026 Oral 🌟</i>
+  <i>🏆 ICML 2026 Outstanding Paper Award 🏆</i>
 </p>
 
 <p align="center">
@@ -46,6 +46,8 @@
 
 ## 📢 News
 
+- **[2026.07]** 🏆 Our paper is awarded the **ICML 2026 Outstanding Paper Award**!
+- **[2026.07]** 🚀 Added support for **LoRA** training! Following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/), LoRA performs comparably to full fine-tuning in RL. See [results](#lora-vs-full-fine-tuning) below.
 - **[2026.05]** 🌟 Our paper is accepted as an Oral at ICML 2026!
 - **[2026.03]** 🎉 Training code, evaluation scripts, and model checkpoints for MATH-500, HumanEval and MBPP datasets released!
 - **[2026.01]** 📄 Paper available on [arXiv](https://arxiv.org/abs/2601.15165)!
@@ -53,20 +55,20 @@
 
 ## Why JustGRPO?
 
-Diffusion LLMs (dLLMs) can generate tokens in **arbitrary order**, which theoretically offers more flexibility than standard left-to-right generation. But does this flexibility actually unlocks unique reasoning capabilities inaccessible to standard AR models?
+Diffusion LLMs (dLLMs) can generate tokens in **arbitrary order**, which theoretically offers more flexibility than standard left-to-right generation. But does this flexibility actually unlock unique reasoning capabilities inaccessible to standard AR models?
 
 <div align="center">
   <img src="assets/mechanism_to_passk.png" width="90%" alt="Mechanism to Pass@k"/>
 </div>
 
-**We found the opposite.** Arbitrary-order generation allows models to *bypass* high-uncertainty tokens (e.g., "Therefore", "Since") — the very tokens that create branching points in reasoning. This premature bypass collapses the solution space, leading to *lower* reasoning potential (Pass@k).
+**We observe that the opposite may hold.** Arbitrary-order generation tends to *bypass* high-uncertainty tokens (e.g., "Therefore", "Since") — the very tokens that create branching points in reasoning. This premature bypass can collapse the solution coverage, limiting the reasoning potential (Pass@k).
 
-**Our solution is simple:** Since AR order preserves better reasoning potential, we just train dLLMs with standard GRPO in AR mode. No bells and whistles.
+**Our solution is simple:** since AR order better preserves reasoning potential, we just train dLLMs with standard GRPO in AR mode. No bells and whistles.
 
 
 ## Results
 
-JustGRPO achieves state-of-the-art performance across reasoning and coding benchmarks:
+Despite its simplicity, JustGRPO achieves strong performance across reasoning and coding benchmarks, comparing favorably with methods that rely on intricate diffusion-specific adaptations:
 
 <div align="center">
   <img src="assets/acc_compare.png" width="90%" alt="Accuracy Comparison"/>
@@ -78,6 +80,17 @@ JustGRPO achieves state-of-the-art performance across reasoning and coding bench
 | **MATH-500** | 39.0 | 45.1 | 45.2 |
 | **HumanEval** | 37.8 | 49.4 | 48.7 |
 | **MBPP** | 50.6 | 52.4 | 49.0 |
+
+### LoRA vs. Full Fine-tuning
+
+We also support training with **LoRA**. Following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/), we set the LoRA learning rate to **10×** that of full fine-tuning. Under this setting, we observe that LoRA converges to performance comparable to full fine-tuning in RL, consistent with the observations in LoRA Without Regret. Empirically, LoRA converges slightly more slowly, so we train it a bit longer (200 steps vs. 125 for full fine-tuning). All results below are at gen length 256:
+
+| Benchmark | Full Fine-tuning | LoRA |
+|:---:|:---:|:---:|
+| **GSM8K** | 89.1 | 89.6 |
+| **MATH-500** | 45.1 | 46.0 |
+| **HumanEval** | 49.4 | 50.6 |
+| **MBPP** | 52.4 | 48.6 |
 
 
 ## Simplicity
@@ -121,9 +134,16 @@ We provide evaluation and training code for **GSM8K**, **MATH-500**, **HumanEval
 ### Evaluation
 
 Model checkpoints:
+
+**Full fine-tuning:**
 - [LLaDA-Instruct-JustGRPO-GSM8K](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-GSM8K) (GSM8K)
 - [LLaDA-Instruct-JustGRPO-Math500](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Math500) (MATH-500)
 - [LLaDA-Instruct-JustGRPO-Code](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Code) (HumanEval & MBPP)
+
+**LoRA adapters:**
+- [LLaDA-Instruct-JustGRPO-GSM8K-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-GSM8K-LoRA) (GSM8K)
+- [LLaDA-Instruct-JustGRPO-Math500-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Math500-LoRA) (MATH-500)
+- [LLaDA-Instruct-JustGRPO-Code-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Code-LoRA) (HumanEval & MBPP)
 
 ```bash
 torchrun --nproc-per-node=8 eval.py \
@@ -131,6 +151,8 @@ torchrun --nproc-per-node=8 eval.py \
   --ckpt_path /path/to/ckpt \
   --gen_length 256 --steps 256 --block_length 32
 ```
+
+The same command works for both types of checkpoints — `eval.py` auto-detects LoRA adapters and loads them onto the base model.
 
 ### Training
 
@@ -160,6 +182,20 @@ accelerate launch --num_processes 8 --config_file configs/fsdp.yaml train.py \
 ```
 
 > **Note:** Keep global batch size = `num_gpus` × `grad_accum` = **64**.
+
+**LoRA:**
+
+Add `--lora` to any of the commands above to train LoRA adapters (r=128, alpha=64, dropout=0.05, bound to the q/k/v/up projections) instead of full finetuning:
+
+```bash
+accelerate launch --num_processes 8 train.py \
+  --dataset gsm8k \
+  --grad_accum 8 \
+  --lora \
+  --total_steps 200
+```
+
+> **Note:** With `--lora` the default learning rate is 5e-5 — 10× the full-finetuning rate of 5e-6, following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/); override with `--lr`. Launch LoRA runs with plain DDP as above (no `--config_file`) — adapter-only training keeps optimizer state tiny, and `configs/fsdp.yaml` is untested with PEFT. Checkpoints save the adapter only; `eval.py` auto-detects them and merges them into the base weights.
 
 
 ## Citation

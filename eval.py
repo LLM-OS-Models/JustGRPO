@@ -43,6 +43,24 @@ def save_log(args, metrics):
     print(f"Log saved to {out_dir}/evaluation_log.json")
 
 
+# ---- LoRA ----
+
+def merge_lora(model, adapter_dir):
+    # Fold the LoRA update (scaling * B @ A) into the base weights, computing the
+    # update in fp32 for numerical accuracy.
+    from safetensors.torch import load_file
+
+    with open(os.path.join(adapter_dir, "adapter_config.json")) as f:
+        cfg = json.load(f)
+    scaling = cfg["lora_alpha"] / cfg["r"]
+    state = load_file(os.path.join(adapter_dir, "adapter_model.safetensors"))
+    for key in [k for k in state if ".lora_A." in k]:
+        target = key.split(".lora_A.")[0].removeprefix("base_model.model.")
+        weight = model.get_submodule(target).weight
+        delta = (state[key.replace(".lora_A.", ".lora_B.")].float() @ state[key].float()) * scaling
+        weight.data += delta.to(weight.dtype)
+
+
 # ---- Math evaluation (GSM8K / MATH500) ----
 
 def eval_math(model, tokenizer, device, args):
@@ -77,7 +95,9 @@ def eval_math(model, tokenizer, device, args):
             model=model, prompt=prompt_ids, steps=args.steps,
             gen_length=args.gen_length, block_length=args.block_length,
         )
-        responses = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+        responses = tokenizer.batch_decode(
+            gen_ids[:, prompt_ids.shape[1]:], skip_special_tokens=True,
+        )
 
         for ans, res in zip(batch["answers"], responses):
             counts[1] += 1
@@ -247,9 +267,15 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained('GSAI-ML/LLaDA-8B-Instruct', trust_remote_code=True)
 
-    model = AutoModel.from_pretrained(
-        args.ckpt_path, trust_remote_code=True, torch_dtype=torch.bfloat16,
-    )
+    if os.path.exists(os.path.join(args.ckpt_path, "adapter_config.json")):
+        model = AutoModel.from_pretrained(
+            'GSAI-ML/LLaDA-8B-Instruct', trust_remote_code=True, torch_dtype=torch.bfloat16,
+        )
+        merge_lora(model, args.ckpt_path)
+    else:
+        model = AutoModel.from_pretrained(
+            args.ckpt_path, trust_remote_code=True, torch_dtype=torch.bfloat16,
+        )
     model.eval().requires_grad_(False).to(device)
 
     if args.task in ("gsm8k", "math500"):

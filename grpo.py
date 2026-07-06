@@ -14,7 +14,7 @@ def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, t
     generated_ids = generate(model=model, prompt=prompt_ids.repeat(num_generations, 1),
                              steps=steps, gen_length=gen_length, temperature=temperature, block_length=1)
 
-    responses = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+    responses = tokenizer.batch_decode(generated_ids[:, prompt_ids.shape[1]:], skip_special_tokens=True)
     return {
         'generated_ids': generated_ids,
         'prompt_len': prompt_ids.shape[1],
