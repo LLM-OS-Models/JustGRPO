@@ -15,7 +15,7 @@ JustGRPO 학습 전 베이스라인. [dLLM 논문](https://arxiv.org/abs/2602.22
 | 태스크 | lm-eval 태스크명 | Metric | 논문 (dLLM Table 3) | 우리 측정 | 차이 |
 |---|---|---|---:|---:|---|
 | GSM8K | `gsm8k_cot` | exact_match (flexible) | 46.3 | **45.72** (±1.37) | −0.58, 오차범위 내 ✅ |
-| MATH | `minerva_math` | exact_match | 12.9 | (진행 중, ~17:12 완료 예정) | |
+| MATH | `minerva_math` | math_verify | 12.9 | **13.60** (±0.47) | +0.7, 근접 재현 ✅ |
 | HumanEval | `humaneval_instruct` | pass@1 | 46.3 | **46.95** (±3.91) | +0.65, 오차범위 내 ✅ |
 | MBPP | `mbpp_instruct` | pass@1 | 38.2 | **38.20** (±2.18) | ±0.00, 정확히 일치 ✅ |
 
