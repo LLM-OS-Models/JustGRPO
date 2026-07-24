@@ -1,20 +1,53 @@
 import torch
 import torch.nn.functional as F
 
-from utils.generate import generate
+from utils.ar_diffusion import generate_ar, ar_logprobs_onepass
 
 
 @torch.no_grad()
-def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, temperature=1., steps=256, gen_length=256):
+def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, temperature=1.,
+           steps=256, gen_length=256, mask_id=None, eos_id=None,
+           sampler=None, rollout_block_size=32):
+    """Rollout + reward.
+
+    Rollouts use the model's native block-diffusion sampler (dllm BD3LMSampler):
+    AR-order (block=1) generation from this 0.6B BD3LM checkpoint degenerates
+    (~49% EOS mass at the first position, digit loops), while block-diffusion sampling
+    solves GSM8K problems reliably. The GRPO update below still optimizes the exact AR
+    factorization, so training remains "AR order" as in JustGRPO.
+    """
     prompts = tokenizer.apply_chat_template([[{"role": "user", "content": p}] for p in batch['problems']],
                                             add_generation_prompt=True, tokenize=False)
     prompt_ids = tokenizer(prompts, return_tensors='pt', padding=True)['input_ids'].to(device)
 
-    # Rollout with AR order (block_length=1)
-    generated_ids = generate(model=model, prompt=prompt_ids.repeat(num_generations, 1),
-                             steps=steps, gen_length=gen_length, temperature=temperature, block_length=1)
+    if sampler is not None:
+        # Native block-diffusion rollout (recommended for BD3LM checkpoints)
+        from dllm.core.samplers import BD3LMSamplerConfig
+        prompt_list = tokenizer(prompts)['input_ids'] * num_generations  # tiled like repeat()
+        seqs = sampler.sample(prompt_list, config=BD3LMSamplerConfig(
+            max_new_tokens=gen_length, steps=steps, block_size=rollout_block_size,
+            temperature=temperature, remasking="low_confidence"))
+        # The sampler left-pads the prompt to a multiple of block_size and stops early
+        # once every sequence hit EOS, so the generation starts at padded_P and may be
+        # shorter than gen_length — pad the tail with EOS (the model's SFT convention).
+        padded_P = -(-max(len(p) for p in prompt_list) // rollout_block_size) * rollout_block_size
+        completion_ids = seqs[:, padded_P:].to(device)
+        if completion_ids.shape[1] < gen_length:
+            completion_ids = F.pad(completion_ids, (0, gen_length - completion_ids.shape[1]), value=eos_id)
+        generated_ids = torch.cat([prompt_ids.repeat(num_generations, 1), completion_ids], dim=1)
+    else:
+        # AR-order rollout (JustGRPO original mode; weak for this base model)
+        generated_ids = generate_ar(model=model, prompt=prompt_ids.repeat(num_generations, 1),
+                                    gen_length=gen_length, mask_id=mask_id, temperature=temperature,
+                                    eos_id=eos_id, min_new_tokens=16)
 
-    responses = tokenizer.batch_decode(generated_ids[:, prompt_ids.shape[1]:], skip_special_tokens=True)
+    # Truncate at EOS before decoding so post-EOS continuation can't confuse the reward
+    responses = []
+    for row in generated_ids[:, prompt_ids.shape[1]:].tolist():
+        if eos_id in row:
+            row = row[:row.index(eos_id)]
+        responses.append(tokenizer.decode(row, skip_special_tokens=True))
+
     return {
         'generated_ids': generated_ids,
         'prompt_len': prompt_ids.shape[1],
@@ -23,31 +56,25 @@ def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, t
 
 
 def logprob_loss(model, inputs, valid_samples, eps=0.2, gain=1.0, temperature=1., accelerator=None,
-                 gen_length=256, mask_id=126336):
+                 gen_length=256, mask_id=None):
     advantages, generated_ids, prompt_len = inputs['advantages'], inputs['generated_ids'], inputs['prompt_len']
-    batch_size, device = advantages.shape[0], generated_ids.device
     prompt_ids, completion_ids = generated_ids[:, :prompt_len], generated_ids[:, prompt_len:]
 
     valid_samples = accelerator.gather(valid_samples).float().mean().item()
     scale = gain / gen_length / (valid_samples + 1e-5)
 
-    for t in range(gen_length):
-        # Construct input with AR masking (Past=Observed, Future=Masked)
-        x = torch.cat([prompt_ids, completion_ids[:, :t],
-                       torch.full((batch_size, gen_length - t), mask_id, device=device, dtype=generated_ids.dtype)], dim=1)
+    # All AR conditionals p(y_t | y_<t) in ONE forward via the BD3LM [x0 | xt] trick
+    # (block size 1, completion fully masked) — replaces the per-token forward loop
+    # the original LLaDA implementation needed.
+    token_log_prob = ar_logprobs_onepass(model, prompt_ids, completion_ids,
+                                         mask_id=mask_id, temperature=temperature)  # [B, G]
 
-        with torch.autocast(device_type="cuda", enabled=True, dtype=torch.bfloat16):
-            logits = model(x).logits / temperature
+    ratio = (token_log_prob - token_log_prob.detach()).exp()
+    clipped_ratio = ratio.clamp(1 - eps, 1 + eps)
+    adv = advantages.unsqueeze(1)
+    loss = -torch.min(ratio * adv, clipped_ratio * adv)
 
-        # Compute log probability of next token
-        log_prob = F.log_softmax(logits[:, prompt_len + t, :].float(), dim=-1)
-        token_log_prob = log_prob.gather(-1, completion_ids[:, t:t+1]).squeeze(-1)
-
-        ratio = (token_log_prob - token_log_prob.detach()).exp()
-        clipped_ratio = ratio.clamp(1 - eps, 1 + eps)
-        loss = -torch.min(ratio * advantages, clipped_ratio * advantages)
-
-        accelerator.backward(loss.mul(scale).sum())
+    accelerator.backward(loss.mul(scale).sum())
 
     return {
         "reward": accelerator.gather(inputs['rewards'].detach()).mean().item(),

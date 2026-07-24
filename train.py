@@ -15,7 +15,7 @@ class TrainConfig:
     """Training hyperparameters for GRPO."""
 
     # --- Model ---
-    model_path: str = "GSAI-ML/LLaDA-8B-Instruct"
+    model_path: str = "/home/ubuntu/data/models/Qwen3-0.6B-diffusion-bd3lm-v0.1"
 
     # --- Training ---
     batch_size_per_device: int = 1
@@ -29,6 +29,8 @@ class TrainConfig:
     repeat_times: int = 2
     gen_steps: int = 256
     gen_length: int = 256
+    rollout_temperature: float = 1.0
+    rollout_block_size: int = 32  # native BD3LM block size for rollouts
 
     # --- LoRA ---
     lora: bool = False
@@ -67,9 +69,11 @@ def train(config: TrainConfig):
 
     # --- Load model ---
     print(f"Loading model from {config.model_path}...")
-    from transformers import AutoTokenizer, AutoModel
+    from transformers import AutoTokenizer, AutoModelForMaskedLM
 
-    model = AutoModel.from_pretrained(
+    # AutoModelForMaskedLM resolves to the LM-head variant for A2D/BD3LM checkpoints
+    # (plain AutoModel maps to the headless backbone and returns no logits).
+    model = AutoModelForMaskedLM.from_pretrained(
         config.model_path,
         trust_remote_code=True,
         torch_dtype=torch.bfloat16,
@@ -92,7 +96,9 @@ def train(config: TrainConfig):
 
     # --- Tokenizer ---
     tokenizer = AutoTokenizer.from_pretrained(config.model_path)
-    tokenizer.pad_token_id = 126336  # LLaDA mask token
+    mask_id = tokenizer.mask_token_id  # <|mask|> = 151669 for Qwen3 BD3LM
+    eos_id = tokenizer.eos_token_id
+    assert mask_id is not None, "model tokenizer must define a mask token"
 
     # --- Load dataset ---
     if config.dataset == "gsm8k":
@@ -136,6 +142,10 @@ def train(config: TrainConfig):
     # --- Accelerator setup ---
     accelerator = dist.get_accelerator()
     model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader)
+
+    # --- Rollout sampler (native block diffusion; see grpo.sample) ---
+    from dllm.core.samplers import BD3LMSampler
+    rollout_sampler = BD3LMSampler(model=accelerator.unwrap_model(model), tokenizer=tokenizer)
 
     # --- Resume ---
     start_step = 0
@@ -188,8 +198,13 @@ def train(config: TrainConfig):
                             device=device,
                             reward_fn=reward_fn,
                             num_generations=config.num_generations,
+                            temperature=config.rollout_temperature,
                             steps=config.gen_steps,
                             gen_length=config.gen_length,
+                            mask_id=mask_id,
+                            eos_id=eos_id,
+                            sampler=rollout_sampler,
+                            rollout_block_size=config.rollout_block_size,
                         )
                         inputs_chunks.append(inputs)
 
@@ -215,6 +230,7 @@ def train(config: TrainConfig):
                             gain=1.0,
                             accelerator=accelerator,
                             gen_length=config.gen_length,
+                            mask_id=mask_id,
                         )
                         all_rewards.append(inputs['rewards'].detach())
 
@@ -260,6 +276,7 @@ def train(config: TrainConfig):
 def parse_args():
     parser = argparse.ArgumentParser(description="JustGRPO Training")
 
+    parser.add_argument("--model_path", type=str, default=None, help="Model path or HF id (default: local Qwen3-0.6B BD3LM)")
     parser.add_argument("--run_dir", type=str, default="./checkpoints", help="Output directory")
     parser.add_argument("--grad_accum", type=int, default=8, help="Gradient accumulation steps")
     parser.add_argument("--total_steps", type=int, default=125, help="Total training steps (125 for full finetuning, 200 for LoRA)")
@@ -276,6 +293,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     config = TrainConfig(
+        **({"model_path": args.model_path} if args.model_path else {}),
         output_dir=args.run_dir,
         grad_accumulation=args.grad_accum,
         total_steps=args.total_steps,
