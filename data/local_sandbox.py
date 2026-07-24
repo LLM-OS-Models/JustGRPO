@@ -76,10 +76,13 @@ def get_successful_tests(
     if not should_execute(program=program, tests=tests):
         return [0] * test_length
 
-    reliability_guard()
     results = []
 
-    with Pool(processes=num_workers) as pool:
+    # reliability_guard must run ONLY inside the forked workers: it nukes os.putenv,
+    # os.remove, subprocess.Popen, ... and partial_undo does not restore all of them.
+    # Running it in the parent bricked the training process at the next
+    # accelerator.save_state() (os.putenv=None -> TypeError).
+    with Pool(processes=num_workers, initializer=reliability_guard) as pool:
         async_results = [pool.apply_async(run_single_test, (program, test)) for test in tests]
         for ar in async_results:
             try:
@@ -87,7 +90,6 @@ def get_successful_tests(
             except TimeoutError:
                 results.append(0)
 
-    partial_undo_reliability_guard()
     return results
 
 
