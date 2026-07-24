@@ -64,8 +64,8 @@ Qwen3-0.6B를 SFT만으로 block diffusion([BD3LM, arXiv:2503.09573](https://arx
 
 | 런 | 데이터 | 스텝 | 스크립트 | 상태 |
 |---|---|---:|---|---|
-| Run 1 | GSM8K(수학) 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 시작 대기 (MATH 평가 직후) |
-| Run 2 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run2_mixed_lora.sh`](scripts/run2_mixed_lora.sh) | 대기 (2순위) |
+| Run 1 | GSM8K(수학) 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 🔥 **학습 중** (7/24 17:10~) |
+| Run 2 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run2_mixed_lora.sh`](scripts/run2_mixed_lora.sh) | 🔥 **학습 중** (7/24 18:35~, Run 1과 동시) |
 | Run 3 | 코드(AceCode-Hard 21K) 단독 | 200 | [`scripts/run3_code_lora.sh`](scripts/run3_code_lora.sh) | 대기 (3순위) |
 | Run 4 (옵션) | MATH-500 단독 | 200 | [`scripts/run4_math500_lora.sh`](scripts/run4_math500_lora.sh) | 대기 |
 
@@ -128,7 +128,9 @@ bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora  
 - 16:30 ✅ 적용 코드 완성 + 동등성/스모크 테스트 통과, AR 붕괴 발견 및 우회 설계
 - 16:50 ✅ 믹싱 로더·런 스크립트·병합/평가 스크립트 완성
 - 17:07 ✅ MATH 평가 완료 (13.60) → **베이스 4태스크 재현 전부 성공**
-- 17:10 ✅ **Run 1 (GSM8K 단독 LoRA, 200스텝) 학습 시작** — 예상 6–8시간
-- **7/25 새벽~오전** Run 1 종료 → 병합 → 4태스크 평가 → 결과 푸시, 이어서 Run 2 (믹싱, 300스텝 9–12시간) 시작
-- **7/25 밤** Run 2 종료 → ckpt-200/300 각각 평가 → **수학 단독 vs 믹싱 비교표 1차 완성**
-- **7/26** Run 3 (코드 단독) → 평가 → 전체 비교표 완성, 모델 HF 업로드
+- 17:10 ✅ **Run 1 (GSM8K 단독 LoRA, 200스텝) 학습 시작** — 스텝 20에서 평균 보상 -0.08(베이스 기대치) → +0.39 상승 확인
+- 18:35 ✅ **Run 2 (믹싱, 300스텝) 동시 시작** — GPU 사용률 32%·VRAM 20GB로 여유가 커서 병렬 실행
+  (rollout이 256회 순차 디노이징 + CPU 채점이라 단일 런으로는 H100을 못 채움; 동시 실행으로 처리량 ~2배)
+- **7/25 오전** Run 1 종료 (~09시 전후) → 병합 → 4태스크 평가 → 결과 푸시
+- **7/25 밤~7/26 새벽** Run 2 종료 → ckpt-200/300 각각 평가 → **수학 단독 vs 믹싱 비교표 1차 완성**, Run 3 (코드) 시작
+- **7/26** Run 3 종료·평가 → 전체 비교표 완성, 모델 HF([`LLM-OS-Models2`](https://huggingface.co/LLM-OS-Models2)) 업로드
