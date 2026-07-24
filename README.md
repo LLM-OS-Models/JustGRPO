@@ -67,7 +67,11 @@ Qwen3-0.6B를 SFT만으로 block diffusion([BD3LM, arXiv:2503.09573](https://arx
 | Run 1 | GSM8K(수학) 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 🔥 **학습 중** (7/24 17:10~) |
 | Run 2 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run2_mixed_lora.sh`](scripts/run2_mixed_lora.sh) | 🔥 **학습 중** (7/24 18:35~, Run 1과 동시) |
 | Run 3 | 코드(AceCode-Hard 21K) 단독 | 200 | [`scripts/run3_code_lora.sh`](scripts/run3_code_lora.sh) | 대기 (3순위) |
-| Run 4 (옵션) | MATH-500 단독 | 200 | [`scripts/run4_math500_lora.sh`](scripts/run4_math500_lora.sh) | 대기 |
+| Run 4 | MATH(수학2) 단독 | 200 | [`scripts/run4_math500_lora.sh`](scripts/run4_math500_lora.sh) | 대기 (4순위) |
+
+Run 4는 옵션이 아니라 정식 포함 — **3개 데이터 각자 RL vs 종합(믹싱) RL**의 완전한 비교가 목표.
+각 런 종료 시 어댑터+병합 모델을 HF org [`LLM-OS-Models2`](https://huggingface.co/LLM-OS-Models2)에
+**퍼블릭 업로드** ([`scripts/upload_hf.py`](scripts/upload_hf.py) — 모델 카드에 학습 방법·사용법·결과 포함).
 
 **학습량 설계**: 스텝당 프롬프트 8개 기준 단독 런은 해당 도메인 1,600개, 믹싱 런은 총 2,400개(도메인당 800개).
 체크포인트가 10스텝마다 저장되므로 믹싱 런에서 **ckpt-200(단독 런과 총 컴퓨트 동일 비교)** 과
@@ -136,8 +140,8 @@ bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora  
 **운영 원칙**: GPU를 실시간 감시하며 빈 슬롯이 생기는 즉시 다음 작업 투입
 (런 종료 → 즉시 병합·평가 → 남는 GPU에 다음 런 시작).
 
-예상 일정 (18:38 기준, 30분 단위로 실측 갱신):
-- **7/25 09~10시** Run 1 종료 → 즉시 병합·4태스크 평가, 동시에 Run 3 (코드) 학습 시작
-- **7/25 밤~7/26 새벽** Run 2 종료 → ckpt-200/300 평가 → **수학 단독 vs 믹싱 비교표 1차 완성**
-- **7/26 낮** Run 3 종료·평가
-- **7/26 밤 목표** 전체 비교표 완성, 모델 HF([`LLM-OS-Models2`](https://huggingface.co/LLM-OS-Models2)) 업로드
+예상 일정 (18:50 기준, 실측으로 계속 갱신):
+- **7/25 09~10시** Run 1 종료 → 즉시 병합·4태스크 평가·HF 업로드, 동시에 Run 3 (코드) 학습 시작
+- **7/25 밤~7/26 새벽** Run 2 종료 → ckpt-200/300 평가·HF 업로드 → **수학 단독 vs 믹싱 비교표 1차 완성**, Run 4 (MATH 단독) 시작
+- **7/26 낮~밤** Run 3 종료·평가·업로드
+- **7/26 밤~7/27 오전** Run 4 종료·평가·업로드 → **최종: 3개 단독 vs 믹싱 × 4벤치마크 전체 비교표**
