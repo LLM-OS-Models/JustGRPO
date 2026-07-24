@@ -136,6 +136,14 @@ bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora  
 - 18:35 ✅ **Run 2 (믹싱, 300스텝) 동시 시작** — GPU 사용률 32%·VRAM 20GB로 여유가 커서 병렬 실행
   (rollout이 256회 순차 디노이징 + CPU 채점이라 단일 런으로는 H100을 못 채움; 동시 실행으로 처리량 ~2배)
 - 18:38 ✅ 동시 실행 후 GPU 99% 도달 (VRAM 40GB/80GB) — 유휴 시간 제거 확인
+- 19:11 ⚠️→✅ Run 2가 스텝 10에서 크래시 — 원본 레포의 잠복 버그 발견·수정
+  (코드 채점 샌드박스 `reliability_guard`가 부모 프로세스 os 모듈을 파괴 → Pool worker
+  `initializer`로 격리, 커밋 `8c83aeb`). Run 2 재시작, 이후 무사고
+- **(7/25)** 새벽 ✅ **Run 1 (GSM8K 단독) 200스텝 완주** — 학습 보상 -0.08(베이스 기대) → +0.2~0.4 고원
+  (rollout 정답률 46%→~65-70%). 종료 즉시 Run 3 (코드) 투입, LoRA 병합, 4태스크 평가 개시
+- ✅ 첫 모델 HF 퍼블릭 업로드:
+  [run1 병합본](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) ·
+  [어댑터](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora-adapter)
 
 **운영 원칙**: GPU를 실시간 감시하며 빈 슬롯이 생기는 즉시 다음 작업 투입
 (런 종료 → 즉시 병합·평가 → 남는 GPU에 다음 런 시작).
