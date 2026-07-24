@@ -57,12 +57,19 @@ Qwen3-0.6B를 SFT만으로 block diffusion([BD3LM, arXiv:2503.09573](https://arx
 
 **학습 런 매트릭스** — 전부 LoRA(r=128, α=64, lr 5e-5), 재현 가능하도록 런별 스크립트 고정:
 
+런 번호 = 실제 실행 순서. **수학 단독 기준선을 먼저 만들고 → 믹싱과 비교 → 그 다음 코드**
+(믹싱 결과가 핵심 관심사이고, 비교가 성립하려면 단독 기준선이 선행되어야 함).
+
 | 런 | 데이터 | 스텝 | 스크립트 | 상태 |
 |---|---|---:|---|---|
-| Run 1 | GSM8K 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 시작 대기 (MATH 평가 직후) |
-| Run 2 | 코드(AceCode-Hard 21K) 단독 | 200 | [`scripts/run2_code_lora.sh`](scripts/run2_code_lora.sh) | 대기 |
-| Run 3 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run3_mixed_lora.sh`](scripts/run3_mixed_lora.sh) | 대기 |
+| Run 1 | GSM8K(수학) 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 시작 대기 (MATH 평가 직후) |
+| Run 2 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run2_mixed_lora.sh`](scripts/run2_mixed_lora.sh) | 대기 (2순위) |
+| Run 3 | 코드(AceCode-Hard 21K) 단독 | 200 | [`scripts/run3_code_lora.sh`](scripts/run3_code_lora.sh) | 대기 (3순위) |
 | Run 4 (옵션) | MATH-500 단독 | 200 | [`scripts/run4_math500_lora.sh`](scripts/run4_math500_lora.sh) | 대기 |
+
+**학습량 설계**: 스텝당 프롬프트 8개 기준 단독 런은 해당 도메인 1,600개, 믹싱 런은 총 2,400개(도메인당 800개).
+체크포인트가 10스텝마다 저장되므로 믹싱 런에서 **ckpt-200(단독 런과 총 컴퓨트 동일 비교)** 과
+**ckpt-300(도메인 노출 보정)** 둘 다 평가해 두 관점의 비교표를 만든다.
 
 각 런 종료 후: [`scripts/merge_lora.py`](scripts/merge_lora.py)로 어댑터 병합 →
 [`scripts/eval_ckpt.sh`](scripts/eval_ckpt.sh)로 4개 벤치마크 평가 → 여기와 BENCHMARKS.md에 기록 →
@@ -119,7 +126,7 @@ bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora  
 - 16:30 ✅ 적용 코드 완성 + 동등성/스모크 테스트 통과, AR 붕괴 발견 및 우회 설계
 - 16:50 ✅ 믹싱 로더·런 스크립트·병합/평가 스크립트 완성
 - **~17:05** MATH 평가 완료 → BENCHMARKS 확정
-- **~17:10** Run 1 (GSM8K LoRA) 학습 시작 — 예상 6–8시간
-- **~01:00 (7/25)** Run 1 종료 → 병합 → 4태스크 평가 (~40분) → 결과 푸시
-- **7/25 중** Run 2 (코드) 또는 Run 3 (믹싱) 시작 — 런당 6–9시간 + 평가
-- **7/26 목표** 단독 vs 믹싱 × 4벤치마크 비교표 완성, 모델 HF 업로드
+- **~17:10** Run 1 (GSM8K 단독 LoRA, 200스텝) 학습 시작 — 예상 6–8시간
+- **7/25 새벽~오전** Run 1 종료 → 병합 → 4태스크 평가 → 결과 푸시, 이어서 Run 2 (믹싱, 300스텝 9–12시간) 시작
+- **7/25 밤** Run 2 종료 → ckpt-200/300 각각 평가 → **수학 단독 vs 믹싱 비교표 1차 완성**
+- **7/26** Run 3 (코드 단독) → 평가 → 전체 비교표 완성, 모델 HF 업로드
