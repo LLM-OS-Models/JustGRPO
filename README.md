@@ -1,224 +1,57 @@
-<div align="center">
+# JustGRPO × Qwen3-0.6B-diffusion-bd3lm
 
-# JustGRPO
+[LeapLabTHU/JustGRPO](https://github.com/LeapLabTHU/JustGRPO)를 기반으로,
+[`dllm-hub/Qwen3-0.6B-diffusion-bd3lm-v0.1`](https://huggingface.co/dllm-hub/Qwen3-0.6B-diffusion-bd3lm-v0.1)
+(block diffusion, [dLLM](https://arxiv.org/abs/2602.22661) 논문의 Tiny-A2D 모델)을 **LoRA + GRPO**로 학습하는 실험 저장소.
 
-**The Flexibility Trap: Rethinking the Value of Arbitrary Order in Diffusion Language Models**
+원본 README는 [README_original.md](README_original.md) 참고.
 
-<p align="center">
-  <i>🏆 ICML 2026 Outstanding Paper Award 🏆</i>
-</p>
+## 구성 요소
 
-<p align="center">
-    <a href="https://nzl-thu.github.io/">Zanlin Ni<sup>1</sup></a> &emsp;
-    <a href="https://scholar.google.com/citations?user=Xgt7njgAAAAJ&hl=zh-CN">Shenzhi Wang<sup>1</sup></a> &emsp;
-    <a href="https://yueyang130.github.io/">Yang Yue<sup>1</sup></a> &emsp;
-    <a href="https://scholar.google.com/citations?user=e-FRHr4AAAAJ&hl=zh-TW">Tianyu Yu<sup>2</sup></a> &emsp;
-    <a href="https://brawny-college-5b2.notion.site/Weilin-Zhao-11d20b7deb8280388213d5f5ed072992">Weilin Zhao<sup>2</sup></a> &emsp;
-    <a href="https://dblp.uni-trier.de/pid/402/2123.html">Yeguo Hua<sup>3</sup></a> &emsp;
-</p>
-<p align="center">
-    Tianyi Chen<sup>3</sup> &emsp;
-    Jun Song<sup>4</sup> &emsp;
-    Cheng Yu<sup>4</sup> &emsp;
-    Bo Zheng<sup>4</sup> &emsp;
-    <a href="https://gaohuang-net.github.io/">Gao Huang<sup>1✉</sup></a>
-</p>
+| 항목 | 위치 |
+|---|---|
+| 베이스 모델 (1.5GB) | `~/data/models/Qwen3-0.6B-diffusion-bd3lm-v0.1` |
+| HF 데이터셋 캐시 (GSM8K, MATH-500) | `~/data/hf_cache` (`HF_HOME`으로 지정) |
+| 코드 RL 데이터 (AceCode-Hard 21K) | `datasets/acecode_hard.jsonl` |
+| 평가 프레임워크 (dllm + lm-eval-harness) | `/home/ubuntu/dllm` (uv venv: `.venv`) |
+| 베이스 모델 벤치마크 기록 | [BENCHMARKS.md](BENCHMARKS.md) |
+| JustGRPO 적용 분석 (수정 지점) | [ADAPTATION.md](ADAPTATION.md) |
 
-<p align="center">
-    <sup>1</sup>LeapLab, Tsinghua University &emsp;
-    <sup>2</sup>NLPLab, Tsinghua University &emsp;
-    <sup>3</sup>Tsinghua University &emsp;
-    <sup>4</sup>Alibaba Group
-</p>
+## 학습 데이터 (JustGRPO 논문 기준, 태스크당 별도 모델)
 
+- **GSM8K** — `openai/gsm8k` train 7,473
+- **MATH-500** — `ankner/math-500` train 7,500
+- **Code** — AceCode-Hard 21K (AceCoder-87K에서 DiffuCoder 파이프라인으로 선별)
 
+평가는 GSM8K test(1,319) / MATH-500 test(500) / HumanEval / MBPP.
 
-[![Project](https://img.shields.io/badge/🌐%20Project-Page-green)](https://nzl-thu.github.io/the-flexibility-trap/)
-[![arXiv](https://img.shields.io/badge/arXiv-2601.15165-b31b1b.svg)](https://arxiv.org/abs/2601.15165)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Model](https://img.shields.io/badge/🤗%20Model-JustGRPO-yellow)](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO)
+## 원본 대비 수정 사항
 
-*No combinatorial trajectories. No ELBO approximations. No diffusion-specific adaptations.*
+- `train.py`, `eval.py`, `data/math.py`: 데이터셋 경로 `"gsm8k"` → `"openai/gsm8k"`
+  (legacy 네임스페이스 없는 경로가 최신 `huggingface_hub`에서 로드 불가)
 
-**Just GRPO.**
-
-</div>
-
-## 📢 News
-
-- **[2026.07]** 🏆 Our paper is awarded the **ICML 2026 Outstanding Paper Award**!
-- **[2026.07]** 🚀 Added support for **LoRA** training! Following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/), LoRA performs comparably to full fine-tuning in RL. See [results](#lora-vs-full-fine-tuning) below.
-- **[2026.05]** 🌟 Our paper is accepted as an Oral at ICML 2026!
-- **[2026.03]** 🎉 Training code, evaluation scripts, and model checkpoints for MATH-500, HumanEval and MBPP datasets released!
-- **[2026.01]** 📄 Paper available on [arXiv](https://arxiv.org/abs/2601.15165)!
-- **[2026.01]** 🎉 Training code, evaluation scripts, and [model checkpoint](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO) on GSM8K released!
-
-## Why JustGRPO?
-
-Diffusion LLMs (dLLMs) can generate tokens in **arbitrary order**, which theoretically offers more flexibility than standard left-to-right generation. But does this flexibility actually unlock unique reasoning capabilities inaccessible to standard AR models?
-
-<div align="center">
-  <img src="assets/mechanism_to_passk.png" width="90%" alt="Mechanism to Pass@k"/>
-</div>
-
-**We observe that the opposite may hold.** Arbitrary-order generation tends to *bypass* high-uncertainty tokens (e.g., "Therefore", "Since") — the very tokens that create branching points in reasoning. This premature bypass can collapse the solution coverage, limiting the reasoning potential (Pass@k).
-
-**Our solution is simple:** since AR order better preserves reasoning potential, we just train dLLMs with standard GRPO in AR mode. No bells and whistles.
-
-
-## Results
-
-Despite its simplicity, JustGRPO achieves strong performance across reasoning and coding benchmarks, comparing favorably with methods that rely on intricate diffusion-specific adaptations:
-
-<div align="center">
-  <img src="assets/acc_compare.png" width="90%" alt="Accuracy Comparison"/>
-</div>
-
-| Benchmark | Gen Length 128 | Gen Length 256 | Gen Length 512 |
-|:---:|:---:|:---:|:---:|
-| **GSM8K** | 83.8 | 89.1 | 89.8 |
-| **MATH-500** | 39.0 | 45.1 | 45.2 |
-| **HumanEval** | 37.8 | 49.4 | 48.7 |
-| **MBPP** | 50.6 | 52.4 | 49.0 |
-
-### LoRA vs. Full Fine-tuning
-
-We also support training with **LoRA**. Following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/), we set the LoRA learning rate to **10×** that of full fine-tuning. Under this setting, we observe that LoRA converges to performance comparable to full fine-tuning in RL, consistent with the observations in LoRA Without Regret. Empirically, LoRA converges slightly more slowly, so we train it a bit longer (200 steps vs. 125 for full fine-tuning). All results below are at gen length 256:
-
-| Benchmark | Full Fine-tuning | LoRA |
-|:---:|:---:|:---:|
-| **GSM8K** | 89.1 | 89.6 |
-| **MATH-500** | 45.1 | 46.0 |
-| **HumanEval** | 49.4 | 50.6 |
-| **MBPP** | 52.4 | 48.6 |
-
-
-## Simplicity
-
-Existing RL methods for dLLMs often require handling the complexity of arbitrary-order generation:
-
-| Challenge | Description |
-|:---|:---|
-| Combinatorial trajectories | Optimizing over factorial-sized denoising paths |
-| Intractable likelihoods | ELBO-based surrogates instead of true objectives |
-| Sampler-learner mismatch | Confidence-based samplers vs. original diffusion prior |
-
-- **JustGRPO sidesteps all of this** by treating dLLMs as autoregressive models during RL training. The result? Standard GRPO, directly applicable, with exact likelihood computation.
-- **The core logic of JustGRPO (`grpo.py`) fits in ~60 lines**: rollout sampling and log-probability loss computation. That's it.
-
-> 💡 The model still retains **parallel decoding** at inference time — we only use AR order during training. See our paper for more details.
-
-
-
-## Installation
-
-JustGRPO is designed to be lightweight and dependency-minimal.
+## 베이스 모델 평가 (dllm 프레임워크)
 
 ```bash
-git clone https://github.com/LeapLabTHU/JustGRPO.git
-cd JustGRPO
-pip install -r requirements.txt
+cd /home/ubuntu/dllm && source .venv/bin/activate
+bash run_eval4_parallel.sh   # gsm8k_cot / humaneval_instruct / mbpp_instruct / minerva_math
+# 결과: ~/data/bench/bd3lm-v0.1/, 정리본은 BENCHMARKS.md
 ```
 
-**Dependencies:**
-- `accelerate`
-- `transformers`
-- `datasets`
-- Standard evaluation utilities (`sympy`, `latex2sympy2`, etc.)
+생성 설정은 dLLM 공식 eval.sh와 동일: `max_new_tokens=256, steps=256, block_size=32, cfg_scale=0.0`.
 
+> vLLM은 사용 불가 — 이 모델은 `AutoModelForMaskedLM` + 커스텀 블록 확산 디노이징 루프로 생성하므로
+> AR 전용 서빙 엔진(vLLM)과 호환되지 않는다.
 
-## Usage
+## JustGRPO 학습 (LoRA)
 
-We provide evaluation and training code for **GSM8K**, **MATH-500**, **HumanEval**, and **MBPP**.
-
-### Evaluation
-
-Model checkpoints:
-
-**Full fine-tuning:**
-- [LLaDA-Instruct-JustGRPO-GSM8K](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-GSM8K) (GSM8K)
-- [LLaDA-Instruct-JustGRPO-Math500](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Math500) (MATH-500)
-- [LLaDA-Instruct-JustGRPO-Code](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Code) (HumanEval & MBPP)
-
-**LoRA adapters:**
-- [LLaDA-Instruct-JustGRPO-GSM8K-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-GSM8K-LoRA) (GSM8K)
-- [LLaDA-Instruct-JustGRPO-Math500-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Math500-LoRA) (MATH-500)
-- [LLaDA-Instruct-JustGRPO-Code-LoRA](https://huggingface.co/nzl-thu/LLaDA-Instruct-JustGRPO-Code-LoRA) (HumanEval & MBPP)
+> ⚠️ 원본 JustGRPO 코드는 LLaDA-8B 전용 하드코딩(mask token 126336, tokenizer, `utils/generate.py`)이
+> 있어 이 모델(mask/pad 처리, vocab, chat template이 다름)에 그대로 쓸 수 없다. 적용 작업은 진행 중.
 
 ```bash
-torchrun --nproc-per-node=8 eval.py \
-  --task gsm8k \  # math500/humaneval/mbpp
-  --ckpt_path /path/to/ckpt \
-  --gen_length 256 --steps 256 --block_length 32
-```
-
-The same command works for both types of checkpoints — `eval.py` auto-detects LoRA adapters and loads them onto the base model.
-
-### Training
-
-**Math (GSM8K / MATH-500):**
-
-```bash
-accelerate launch --num_processes 8 --config_file configs/fsdp.yaml train.py \
+accelerate launch --num_processes 1 train.py \
   --dataset gsm8k \
-  --grad_accum 8
-```
-
-```bash
-accelerate launch --num_processes 8 --config_file configs/fsdp.yaml train.py \
-  --dataset math \
-  --grad_accum 8
-```
-
-**Code (MBPP / HumanEval):**
-
-Code training uses the **AceCode-Hard** subset, following [ml-diffucoder](https://github.com/apple/ml-diffucoder). You can download the dataset here: [AceCode-Hard (Google Drive)](https://drive.google.com/file/d/1eyxdcLRiEI0Km9ohaGxah0hj53iUWuMA/view?usp=sharing). Place the downloaded file at `datasets/acecode_hard.jsonl`.
-
-```bash
-accelerate launch --num_processes 8 --config_file configs/fsdp.yaml train.py \
-  --dataset code \
-  --code_data_path datasets/acecode_hard.jsonl \
-  --grad_accum 8
-```
-
-> **Note:** Keep global batch size = `num_gpus` × `grad_accum` = **64**.
-
-**LoRA:**
-
-Add `--lora` to any of the commands above to train LoRA adapters (r=128, alpha=64, dropout=0.05, bound to the q/k/v/up projections) instead of full finetuning:
-
-```bash
-accelerate launch --num_processes 8 train.py \
-  --dataset gsm8k \
-  --grad_accum 8 \
+  --grad_accum 64 \
   --lora \
   --total_steps 200
 ```
-
-> **Note:** With `--lora` the default learning rate is 5e-5 — 10× the full-finetuning rate of 5e-6, following [LoRA Without Regret](https://thinkingmachines.ai/blog/lora/); override with `--lr`. Launch LoRA runs with plain DDP as above (no `--config_file`) — adapter-only training keeps optimizer state tiny, and `configs/fsdp.yaml` is untested with PEFT. Checkpoints save the adapter only; `eval.py` auto-detects them and merges them into the base weights.
-
-
-## Citation
-
-If you find this work useful, please consider citing our paper.
-
-```bibtex
-@inproceedings{ni2026flexibility,
-  title={The Flexibility Trap: Rethinking the Value of Arbitrary Order in Diffusion Language Models},
-  author={Ni, Zanlin and Wang, Shenzhi and Yue, Yang and Yu, Tianyu and Zhao, Weilin and Hua, Yeguo and Chen, Tianyi and Song, Jun and Yu, Cheng and Zheng, Bo and Huang, Gao},
-  booktitle={ICML},
-  year={2026}
-}
-```
-
-## Acknowledgments
-
-This project builds upon the following excellent works:
-
-- [LLaDOU](https://github.com/maple-research-lab/LLaDOU)
-- [ml-diffucoder](https://github.com/apple/ml-diffucoder)
-- [ESPO](https://github.com/ML-GSAI/ESPO)
-- [LLaDA](https://github.com/ML-GSAI/LLaDA)
-- [d1](https://github.com/dllm-reasoning/d1)
-
-We sincerely appreciate the authors for making their work open source.

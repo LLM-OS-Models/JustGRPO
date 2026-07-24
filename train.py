@@ -99,7 +99,7 @@ def train(config: TrainConfig):
         print("Loading GSM8K dataset...")
         from data.math import load_gsm8k_dataset_and_reward
         dataloader, reward_fn = load_gsm8k_dataset_and_reward(
-            local_path="gsm8k",
+            local_path="openai/gsm8k",
             batch_size=config.batch_size_per_device,
             num_workers=4,
         )

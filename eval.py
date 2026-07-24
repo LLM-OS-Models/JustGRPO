@@ -65,7 +65,7 @@ def merge_lora(model, adapter_dir):
 
 def eval_math(model, tokenizer, device, args):
     if args.task == "gsm8k":
-        ds = load_dataset("gsm8k", "main", split="test").with_format("torch")
+        ds = load_dataset("openai/gsm8k", "main", split="test").with_format("torch")
         collate_fn = collate_fn_gsm8k
     else:
         ds = load_dataset("ankner/math-500", split="test").with_format("torch")

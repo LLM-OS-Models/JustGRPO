@@ -49,7 +49,7 @@ def reward_gsm8k(batch, responses, num_generations, device):
 
 
 def load_gsm8k_dataset_and_reward(
-    local_path: str = "gsm8k",
+    local_path: str = "openai/gsm8k",
     batch_size: int = 1,
     split: str = 'train',
     num_workers: int = 4,
