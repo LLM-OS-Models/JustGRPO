@@ -127,6 +127,15 @@ def train(config: TrainConfig):
             batch_size=config.batch_size_per_device,
             num_workers=4,
         )
+    elif config.dataset == "mixed":
+        if not config.code_data_path:
+            raise ValueError("--code_data_path is required when dataset=mixed")
+        print("Loading mixed dataset (gsm8k + math + code, round-robin)...")
+        from data.mixed import load_mixed_dataset_and_reward
+        dataloader, reward_fn = load_mixed_dataset_and_reward(
+            code_data_path=config.code_data_path,
+            batch_size=config.batch_size_per_device,
+        )
     else:
         raise ValueError(f"Unknown dataset: {config.dataset}")
 
