@@ -3,3 +3,4 @@ __pycache__/
 datasets/acecode_hard.jsonl
 checkpoints/
 EvalResult/
+cache/
