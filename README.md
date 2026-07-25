@@ -2,11 +2,27 @@
 
 > **한 줄 요약**: ICML 2026 수상작 [JustGRPO](https://arxiv.org/abs/2601.15165)의 RL 레시피(원본: LLaDA-8B 전용)를
 > 13배 작은 block-diffusion 모델 [Qwen3-0.6B-diffusion-bd3lm](https://huggingface.co/dllm-hub/Qwen3-0.6B-diffusion-bd3lm-v0.1)에
-> 이식하고, **단독 도메인 vs 멀티 도메인(수학+코드 믹싱) RL**의 성능을 4개 벤치마크에서 비교하는 실험 저장소.
+> 이식하고, **단독 도메인 RL vs 멀티 도메인(수학+코드 믹싱) RL**의 성능을 4개 벤치마크에서 비교하는 실험 저장소.
 
 - 원본 JustGRPO README: [README_original.md](README_original.md)
-- 기술 분석 (하드코딩 제거·설계 결정): [ADAPTATION.md](ADAPTATION.md)
-- 벤치마크 결과 원장: [BENCHMARKS.md](BENCHMARKS.md)
+- 기술 분석 (하드코딩 제거·설계 결정·논문과의 차이): [ADAPTATION.md](ADAPTATION.md)
+- 벤치마크 결과 원장 (전체 수치): [BENCHMARKS.md](BENCHMARKS.md)
+
+## 📌 현재 상태 (7/25 10:20 갱신)
+
+| 런 | 데이터 | 스텝 | 상태 |
+|---|---|---|---|
+| Run 1 v1 | GSM8K 단독 | 200 | ✅ 완료·평가·[HF 업로드](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) — GSM8K 45.72 → **48.67** (+2.95). 단, v1 손실 버그 영향 있음(아래) → v2 재실행 예정 |
+| Run 2 v2 | 믹싱 (gsm8k+math+code) | 300 | 🔥 학습 중 (7/25 10:05 시작, 완료 예상 7/26 오전) |
+| Run 3 v2 | 코드 단독 | 200 | 🔥 학습 중 (7/25 10:10 시작, 완료 예상 7/26 새벽) |
+| Run 1 v2 | GSM8K 단독 (재실행) | 200 | 대기 — Run 3 종료 후 슬롯에 투입 |
+| Run 4 | MATH 단독 | 200 | 대기 |
+
+**중간 발견 2건** (둘 다 커밋·문서화됨):
+1. 원본 레포의 코드 채점 샌드박스가 학습 프로세스의 os 모듈을 파괴하는 버그 → Pool worker 격리로 수정 (`8c83aeb`)
+2. **EOS 패딩 버그 (v1 손실)**: 조기 종료된 완성을 EOS로 패딩하고 전 구간 학습 → EOS 과잉 강화로
+   믹싱 v1 모델이 "빈 응답"으로 붕괴 (HumanEval 46.9 → 18.3). first-EOS 마스킹으로 수정하고
+   Run 2/3을 v2로 재시작 (`663e584`). v1 산출물은 ablation으로 보존 (`runs/*-v1-eosbug`)
 
 ---
 
@@ -18,89 +34,75 @@ Diffusion LM의 임의 순서 생성은 오히려 추론 잠재력(Pass@k)을 �
 표준 GRPO를 AR 순서로 돌리면 된다는 논문. LLaDA-8B-Instruct에서의 결과 (gen length 256):
 
 | 벤치마크 | LLaDA-8B 베이스 | + JustGRPO | 향상 |
-|---|---:|---:|---:|
+|---|---|---|---|
 | GSM8K | 78.6 | **89.1** | +10.5 |
 | MATH-500 | 30.4 | **45.1** | +14.7 |
 | HumanEval | 40.5 | **49.4** | +8.9 |
 | MBPP | 40.7 | **52.4** | +11.7 |
 
-**② dLLM / Tiny-A2D — 우리가 학습할 베이스 모델의 출처**
+**② dLLM / Tiny-A2D — 우리가 학습하는 베이스 모델의 출처**
 ([arXiv:2602.22661](https://arxiv.org/html/2602.22661), [GitHub](https://github.com/ZHZisZZ/dllm))
 Qwen3-0.6B를 SFT만으로 block diffusion([BD3LM, arXiv:2503.09573](https://arxiv.org/abs/2503.09573)) 모델로
 변환한 초소형 dLLM. 블록(32토큰) 단위로는 AR, 블록 내부는 확산으로 생성.
 
 **③ 멀티 도메인 RLVR — 2026년 프런티어 모델들의 표준 레시피**
-단일 태스크 RL은 이제 소수파다. 참고한 최신 사례:
-- [Nemotron 3 Super](https://arxiv.org/abs/2604.12374): **21개 환경 / 37개 데이터셋 동시** RLVR ([공식 레시피](https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/super3/README.md), [RLVR 단계 문서](https://docs.nvidia.com/nemotron/latest/nemotron/super3/rl/rlvr.html))
-- [Kimi K2](https://arxiv.org/abs/2507.20534): Gym식 확장 프레임워크로 검증가능 보상 태스크를 대규모 혼합
-- [GLM-5](https://arxiv.org/pdf/2602.15763): SFT → 추론 RL → 에이전틱 RL → 일반 RL 다단계 + 스테이지 간 증류
-- 학술 근거: [Can One Domain Help Others? (arXiv:2507.17512)](https://arxiv.org/abs/2507.17512) — GRPO로 수학/코드/퍼즐
-  단독 vs 혼합을 체계 비교. 혼합은 대체로 이득이지만 도메인 간 간섭도 실재.
-  후속: [To Mix or To Merge (arXiv:2602.12566)](https://arxiv.org/pdf/2602.12566),
+- [Nemotron 3 Super](https://arxiv.org/abs/2604.12374): 21개 환경 / 37개 데이터셋 동시 RLVR
+  ([공식 레시피](https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/super3/README.md))
+- [Kimi K2](https://arxiv.org/abs/2507.20534): Gym식 프레임워크로 검증가능 보상 태스크 대규모 혼합
+- [GLM-5](https://arxiv.org/pdf/2602.15763): SFT → 추론 RL → 에이전틱 RL → 일반 RL 다단계
+- 학술 근거: [Can One Domain Help Others? (arXiv:2507.17512)](https://arxiv.org/abs/2507.17512) —
+  GRPO로 수학/코드/퍼즐 단독 vs 혼합 비교. 혼합은 대체로 이득이지만 도메인 간 간섭도 실재.
+  관련: [To Mix or To Merge (arXiv:2602.12566)](https://arxiv.org/pdf/2602.12566),
   [멀티 도메인 커리큘럼 RLVR (arXiv:2606.25178)](https://arxiv.org/pdf/2606.25178)
 
-**우리의 질문**: 이 트렌드가 0.6B급 diffusion LM에서도 성립하는가? — diffusion LM + 멀티 도메인 RLVR 조합은
-아직 발표된 사례가 없다.
+**우리의 질문**: 이 트렌드가 0.6B급 diffusion LM에서도 성립하는가? —
+diffusion LM + 멀티 도메인 RLVR 조합은 아직 발표된 사례가 없다.
 
 ---
 
-## 2. 실험 설계
+## 2. 실험 설계와 지금까지의 결과
 
-**베이스 모델 재현 검증 (완료)** — 학습 전, dLLM 논문 수치를 우리 환경에서 재현해 평가 파이프라인부터 신뢰 확보:
+**베이스 모델 재현 검증 (완료)** — 4개 벤치마크 전부 dLLM 논문 수치를 오차범위 내 재현:
 
-| 벤치마크 | dLLM 논문 | 우리 재현 | 판정 |
-|---|---:|---:|---|
-| GSM8K | 46.3 | **45.72** ±1.37 | 오차범위 내 ✅ |
-| MATH (minerva) | 12.9 | **13.60** ±0.47 | 근접 재현 (+0.7) ✅ |
-| HumanEval | 46.3 | **46.95** ±3.91 | 오차범위 내 ✅ |
-| MBPP | 38.2 | **38.20** ±2.18 | 정확히 일치 ✅ |
+| 벤치마크 | dLLM 논문 | 우리 재현 |
+|---|---|---|
+| GSM8K | 46.3 | **45.72** |
+| MATH (minerva) | 12.9 | **13.60** |
+| HumanEval | 46.3 | **46.95** |
+| MBPP | 38.2 | **38.20** |
 
-**4개 전부 재현 성공** — 평가 파이프라인 신뢰 확보 완료.
+**Run 1 v1 결과** (GSM8K 단독, EOS 버그 있는 v1 손실 — 참고용 ablation):
 
-**학습 런 매트릭스** — 전부 LoRA(r=128, α=64, lr 5e-5), 재현 가능하도록 런별 스크립트 고정:
+| 벤치마크 | 베이스 | v1 학습 후 | 변화 |
+|---|---|---|---|
+| GSM8K (타깃) | 45.72 | **48.67** | **+2.95** |
+| MATH | 13.60 | 13.00 | 보합 |
+| HumanEval | 46.95 | 35.98 | −10.97 |
+| MBPP | 38.20 | 28.80 | −9.40 |
 
-런 번호 = 실제 실행 순서. **수학 단독 기준선을 먼저 만들고 → 믹싱과 비교 → 그 다음 코드**
-(믹싱 결과가 핵심 관심사이고, 비교가 성립하려면 단독 기준선이 선행되어야 함).
+타깃은 오르고 코드가 급락 — 다만 코드 하락분에는 도메인 간섭과 EOS 버그 효과가 섞여 있어,
+**v2 재실행 결과가 정본**이 된다. 전체 수치와 버그 분석은 [BENCHMARKS.md](BENCHMARKS.md).
 
-| 런 | 데이터 | 스텝 | 스크립트 | 상태 |
-|---|---|---:|---|---|
-| Run 1 | GSM8K(수학) 단독 | 200 | [`scripts/run1_gsm8k_lora.sh`](scripts/run1_gsm8k_lora.sh) | 🔥 **학습 중** (7/24 17:10~) |
-| Run 2 | **믹싱** (gsm8k+math+code 라운드로빈) | 300 | [`scripts/run2_mixed_lora.sh`](scripts/run2_mixed_lora.sh) | 🔥 **학습 중** (7/24 18:35~, Run 1과 동시) |
-| Run 3 | 코드(AceCode-Hard 21K) 단독 | 200 | [`scripts/run3_code_lora.sh`](scripts/run3_code_lora.sh) | 대기 (3순위) |
-| Run 4 | MATH(수학2) 단독 | 200 | [`scripts/run4_math500_lora.sh`](scripts/run4_math500_lora.sh) | 대기 (4순위) |
-
-Run 4는 옵션이 아니라 정식 포함 — **3개 데이터 각자 RL vs 종합(믹싱) RL**의 완전한 비교가 목표.
-각 런 종료 시 어댑터+병합 모델을 HF org [`LLM-OS-Models2`](https://huggingface.co/LLM-OS-Models2)에
-**퍼블릭 업로드** ([`scripts/upload_hf.py`](scripts/upload_hf.py) — 모델 카드에 학습 방법·사용법·결과 포함).
-
-**학습량 설계**: 스텝당 프롬프트 8개 기준 단독 런은 해당 도메인 1,600개, 믹싱 런은 총 2,400개(도메인당 800개).
-체크포인트가 10스텝마다 저장되므로 믹싱 런에서 **ckpt-200(단독 런과 총 컴퓨트 동일 비교)** 과
-**ckpt-300(도메인 노출 보정)** 둘 다 평가해 두 관점의 비교표를 만든다.
-
-각 런 종료 후: [`scripts/merge_lora.py`](scripts/merge_lora.py)로 어댑터 병합 →
-[`scripts/eval_ckpt.sh`](scripts/eval_ckpt.sh)로 4개 벤치마크 평가 → 여기와 BENCHMARKS.md에 기록 →
-HF org [`LLM-OS-Models2`](https://huggingface.co/LLM-OS-Models2)에 업로드.
+**학습량 설계**: 스텝당 프롬프트 8개(각 16 rollouts). 단독 런은 해당 도메인 1,600 프롬프트,
+믹싱 런은 총 2,400개(도메인당 800개). 체크포인트가 10스텝마다 저장되므로 믹싱 런에서
+ckpt-200(단독과 총 컴퓨트 동일)과 ckpt-300(도메인 노출 보정) 둘 다 평가한다.
 
 ---
 
 ## 3. 방법: 원본 JustGRPO에서 바뀐 것
 
-원본 코드는 LLaDA-8B 하드코딩(mask 126336, full-bidirectional attention 가정)이라 그대로 안 돌아간다.
-검증 과정에서 나온 핵심 변경 세 가지 (상세: [ADAPTATION.md](ADAPTATION.md)):
+핵심 변경 3가지 + 수정 2가지 (상세: [ADAPTATION.md](ADAPTATION.md)):
 
-1. **Rollout = 네이티브 블록 확산 샘플링.** 이 0.6B 모델은 AR(블록=1) 생성이 붕괴한다
-   (첫 위치 EOS 확률 49% — SFT 시 EOS 블록 패딩의 아티팩트, 이후 숫자 반복 루프. 전부 실측).
-   같은 GSM8K 문제를 블록 확산 샘플링은 8/8 정답 → rollout은 dllm의 `BD3LMSampler`(block 32) 사용.
-2. **손실 = AR one-pass logprob.** BD3LM의 `[x0 ∥ xt]` 학습 마스크 트릭(블록=1 특수화)으로
-   원본의 **256회 forward 루프를 1회 forward로 대체**. fp32에서 순차 루프 대비 최대 오차 2e-5로
-   동일성 검증(`tests/test_adaptation.py`). GRPO ratio는 on-policy 첫 업데이트에서 1이므로
-   advantage-가중 AR 학습으로 성립 — "학습은 AR 순서" 철학 유지.
-3. **멀티 도메인 믹싱 로더** (`data/mixed.py`). 배치 단위 라운드로빈 + 도메인별 reward 라우팅.
-   GRPO가 그룹 단위로 advantage를 정규화하므로 수학(±1)/코드(0~2) 보상 스케일 차이는 자동 흡수 —
-   Nemotron식 멀티 환경 RLVR과 같은 원리.
-
-End-to-end 스모크 테스트: 실제 GSM8K 문제에서 rewards `[-1,1,1,1,-1,1,-1,1]` (5/8 정답),
-advantage/LoRA gradient 정상 확인.
+1. **Rollout = 네이티브 블록 확산 샘플링.** 이 0.6B 모델은 AR(블록=1) 생성이 붕괴
+   (첫 위치 EOS 확률 49% — SFT의 EOS 블록 패딩 아티팩트. 실측). 블록 확산은 같은 문제 8/8 정답
+   → rollout은 dllm의 `BD3LMSampler`(block 32) 사용
+2. **손실 = AR one-pass logprob.** BD3LM의 x0∥xt 학습 마스크 트릭(블록=1 특수화)으로
+   원본의 256회 forward 루프를 **1회 forward로 대체**. fp32에서 순차 루프 대비 최대 오차 2e-5로
+   동일성 검증 (`tests/test_adaptation.py`)
+3. **멀티 도메인 믹싱 로더** (`data/mixed.py`): 배치 단위 라운드로빈 + 도메인별 보상 라우팅.
+   GRPO 그룹 정규화가 보상 스케일 차이(수학 ±1, 코드 0–2)를 흡수
+4. **샌드박스 격리 수정**: 코드 채점의 reliability_guard를 워커 프로세스로 격리 (부모 os 파괴 버그)
+5. **first-EOS 마스킹 (v2)**: 손실을 실제 생성 토큰 + 첫 EOS까지만 적용 (표준 completion masking)
 
 ---
 
@@ -112,44 +114,36 @@ advantage/LoRA gradient 정상 확인.
 #  - 평가: /home/ubuntu/dllm/.venv (+ lm-evaluation-harness)
 # 모델/데이터: ~/data/models/Qwen3-0.6B-diffusion-bd3lm-v0.1, HF_HOME=~/data/hf_cache
 
-bash scripts/run1_gsm8k_lora.sh                       # 학습 (Run 1)
-python scripts/merge_lora.py \
+bash scripts/run1_gsm8k_lora.sh     # 단독 GSM8K (Run 2/3/4도 동일 패턴)
+python scripts/merge_lora.py --adapter ~/data/runs/run1-gsm8k-lora/ckpt-000200 \
+  --out ~/data/models/run1-gsm8k-lora-merged
+bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora
+python scripts/upload_hf.py --run run1-gsm8k-lora --dataset gsm8k \
   --adapter ~/data/runs/run1-gsm8k-lora/ckpt-000200 \
-  --out ~/data/models/run1-gsm8k-lora-merged          # LoRA 병합
-bash scripts/eval_ckpt.sh ~/data/models/run1-gsm8k-lora-merged run1-gsm8k-lora  # 4태스크 평가
+  --merged ~/data/models/run1-gsm8k-lora-merged   # HF LLM-OS-Models2에 퍼블릭 업로드
 ```
 
-주의: vLLM 사용 불가(확산 디노이징 루프 ↔ AR 전용 엔진 비호환). 평가 배치는 16 권장
-(vocab 152k 로짓 텐서가 커서 배치 64는 OOM — 실측).
+주의: vLLM 사용 불가(확산 디노이징 루프는 AR 전용 엔진과 비호환). 평가 배치는 16 이하 권장
+(vocab 152k 로짓 텐서 때문에 배치 64는 OOM — 실측).
 
 ---
 
-## 5. 진행 로그 & 예상 일정 (2026-07-24)
+## 5. 진행 로그
 
-- 15:28 ✅ 모델 + 데이터셋(GSM8K/MATH-500/AceCode-Hard 21K) 다운로드
-- 16:03 ✅ 베이스 4태스크 평가 시작 (배치 64 OOM → 16으로 재실행)
-- 16:29 ✅ GSM8K 45.72 / HumanEval 46.95 / MBPP 38.20 — 3개 재현 성공
-- 16:30 ✅ 적용 코드 완성 + 동등성/스모크 테스트 통과, AR 붕괴 발견 및 우회 설계
-- 16:50 ✅ 믹싱 로더·런 스크립트·병합/평가 스크립트 완성
-- 17:07 ✅ MATH 평가 완료 (13.60) → **베이스 4태스크 재현 전부 성공**
-- 17:10 ✅ **Run 1 (GSM8K 단독 LoRA, 200스텝) 학습 시작** — 스텝 20에서 평균 보상 -0.08(베이스 기대치) → +0.39 상승 확인
-- 18:35 ✅ **Run 2 (믹싱, 300스텝) 동시 시작** — GPU 사용률 32%·VRAM 20GB로 여유가 커서 병렬 실행
-  (rollout이 256회 순차 디노이징 + CPU 채점이라 단일 런으로는 H100을 못 채움; 동시 실행으로 처리량 ~2배)
-- 18:38 ✅ 동시 실행 후 GPU 99% 도달 (VRAM 40GB/80GB) — 유휴 시간 제거 확인
-- 19:11 ⚠️→✅ Run 2가 스텝 10에서 크래시 — 원본 레포의 잠복 버그 발견·수정
-  (코드 채점 샌드박스 `reliability_guard`가 부모 프로세스 os 모듈을 파괴 → Pool worker
-  `initializer`로 격리, 커밋 `8c83aeb`). Run 2 재시작, 이후 무사고
-- **(7/25)** 새벽 ✅ **Run 1 (GSM8K 단독) 200스텝 완주** — 학습 보상 -0.08(베이스 기대) → +0.2~0.4 고원
-  (rollout 정답률 46%→~65-70%). 종료 즉시 Run 3 (코드) 투입, LoRA 병합, 4태스크 평가 개시
-- ✅ 첫 모델 HF 퍼블릭 업로드:
-  [run1 병합본](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) ·
-  [어댑터](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora-adapter)
+**7/24**
+- 15:28 모델 + 데이터셋(GSM8K, MATH-500, AceCode-Hard 21K) 다운로드
+- 16:03 – 17:07 베이스 4태스크 평가 → 전부 재현 성공
+- 오후 적용 코드 완성: one-pass 손실 동등성 검증, AR 붕괴 발견 → 블록 확산 rollout 설계, 스모크 테스트 통과
+- 17:10 Run 1 v1 (GSM8K 단독) 시작 / 18:35 Run 2 v1 (믹싱) 동시 시작 — GPU 99% 포화
+- 19:11 Run 2 크래시 → 샌드박스 os 파괴 버그 수정 후 재시작
 
-**운영 원칙**: GPU를 실시간 감시하며 빈 슬롯이 생기는 즉시 다음 작업 투입
-(런 종료 → 즉시 병합·평가 → 남는 GPU에 다음 런 시작).
+**7/25**
+- 새벽 Run 1 v1 200스텝 완주 → 평가 (GSM8K +2.95 / 코드 급락) → HF 업로드, Run 3 v1 (코드) 시작
+- 오전 믹싱 ckpt-200 평가에서 빈 응답 붕괴 발견 → **EOS 패딩 버그 진단·수정 (first-EOS 마스킹)**
+- 10:05 / 10:10 **Run 2 v2 (믹싱) · Run 3 v2 (코드) 재시작** ← 지금 학습 중
 
-예상 일정 (18:50 기준, 실측으로 계속 갱신):
-- **7/25 09~10시** Run 1 종료 → 즉시 병합·4태스크 평가·HF 업로드, 동시에 Run 3 (코드) 학습 시작
-- **7/25 밤~7/26 새벽** Run 2 종료 → ckpt-200/300 평가·HF 업로드 → **수학 단독 vs 믹싱 비교표 1차 완성**, Run 4 (MATH 단독) 시작
-- **7/26 낮~밤** Run 3 종료·평가·업로드
-- **7/26 밤~7/27 오전** Run 4 종료·평가·업로드 → **최종: 3개 단독 vs 믹싱 × 4벤치마크 전체 비교표**
+**예상 일정** (2런 동시, 스텝당 약 5분 실측 기준)
+- 7/26 새벽 2–3시: Run 3 v2 종료 → 평가·업로드, Run 1 v2 재실행 시작
+- 7/26 오전 9–10시: Run 2 v2 종료 → ckpt-200/300 평가 → **단독 vs 믹싱 비교표**
+- 7/26 오후–밤: Run 1 v2 종료·평가, Run 4 (MATH 단독) 시작
+- 7/26 밤 – 7/27: Run 4 종료·평가 → **최종 매트릭스 (3단독 + 믹싱 × 4벤치마크) + HF 업로드 완료**

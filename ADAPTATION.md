@@ -16,9 +16,9 @@ gen length 256. one-pass 손실은 원본의 256회 forward 루프와 수학적�
 | 2 | **모델 체급** | LLaDA-8B (MDLM) | Qwen3-0.6B (BD3LM), 13× 작음 | RLVR은 기존 능력을 벼리는 성격이라 작은 모델은 향상폭도 통상 작음. 또한 MDLM(전체 양방향) vs BD3LM(블록 인과)이라 attention mask를 명시적으로 구성해야 함 |
 | 3 | **글로벌 배치** | 스텝당 프롬프트 64 (8 GPU) | 스텝당 8 (1 GPU) | 업데이트 노이즈 증가. 스텝 수는 논문 LoRA 기준(200) 유지 |
 
-**기대치 조정**: 논문은 8B에서 +8.9~+14.7pt. 우리 현실적 목표는 **절반 수준(+4~9pt)이면 성공**.
-긍정 신호: 학습 보상이 베이스 기대치(-0.08)에서 20스텝 만에 +0.35~0.39로 상승
-(학습 분포 기준 rollout 정답률 46% → ~67%). 단, 0.6B dLLM에 RL을 얹은 공개 선례가 없어
+**기대치 조정**: 논문은 8B에서 +8.9 – +14.7pt. 우리 현실적 목표는 **절반 수준(+4–9pt)이면 성공**.
+긍정 신호: 학습 보상이 베이스 기대치(-0.08)에서 20스텝 만에 +0.35–0.39로 상승
+(학습 분포 기준 rollout 정답률 46% → 약 67%). 단, 0.6B dLLM에 RL을 얹은 공개 선례가 없어
 결과가 어느 쪽이든 novel한 데이터 포인트가 된다.
 
 ## 두 모델의 차이
@@ -29,7 +29,7 @@ gen length 256. one-pass 손실은 원본의 256회 forward 루프와 수학적�
 | 방식 | MDLM (전체 시퀀스 확산, full bidirectional attention) | **BD3LM** (블록 확산: 블록 간 causal, 블록 내 bidirectional) |
 | mask token | 126336 | **151669** (`<|mask|>`) |
 | eos / pad | (LLaDA 고유) | eos 151645 (`<|im_end|>`), pad 151643 (`<|endoftext|>`) |
-| vocab | ~126k | **151,936** (로짓 텐서 큼 → 배치 크기 주의) |
+| vocab | 약 126k | **151,936** (로짓 텐서 큼 → 배치 크기 주의) |
 | attention | 항상 full bidirectional | **block-causal mask + position_ids를 forward에 전달해야 함** |
 | 로딩 | `AutoModel` | `AutoModelForMaskedLM` (`trust_remote_code=True`) |
 
@@ -57,15 +57,15 @@ gen length 256. one-pass 손실은 원본의 256회 forward 루프와 수학적�
 - 원본: 토큰 위치마다 별도 forward × gen_length(256회). LLaDA가 MDLM이라 불가피했던 구조.
 - BD3LM은 학습 시 쓰는 "x0 ∥ xt 연결 시퀀스 + 블록 확산 attention mask" 트릭으로
   **한 번의 forward로 전 토큰의 조건부 logprob 계산 가능** (block=1이면 AR teacher-forcing과 동일).
-  → 256× forward 루프를 1~2회 forward로 축소 가능. RL 학습 속도에 매우 큰 이득.
+  → 256× forward 루프를 1–2회 forward로 축소 가능. RL 학습 속도에 매우 큰 이득.
 
 ## VRAM / 속도 전망 (1× H100 80GB)
 
 - 0.6B bf16 가중치 ≈ 1.2GB. LoRA(r=128) + AdamW 상태 포함해도 수 GB.
 - 주의점은 vocab 151,936의 로짓 크기: 배치 64 × 시퀀스 1k 로짓 ≈ 20GB (평가에서 OOM 유발 확인).
   학습 시 배치/시퀀스 설계에서 로짓 메모리를 기준으로 잡을 것.
-- 원본 하이퍼파라미터(글로벌 배치 64) 유지 시: `batch_size_per_device` 8~16,
-  `grad_accum` 8~4로 재배분하면 1 GPU로 LoRA 200스텝이 수 시간 내 가능할 것으로 추정
+- 원본 하이퍼파라미터(글로벌 배치 64) 유지 시: `batch_size_per_device` 8–16,
+  `grad_accum` 8–4로 재배분하면 1 GPU로 LoRA 200스텝이 수 시간 내 가능할 것으로 추정
   (위 4번 최적화 적용 시 추가 단축).
 
 ## 베이스라인 성능
