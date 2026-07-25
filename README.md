@@ -79,11 +79,13 @@ Qwen3-0.6B를 SFT만으로 block diffusion([BD3LM, arXiv:2503.09573](https://arx
 diffusion LM + 멀티 도메인 RLVR 조합은 아직 발표된 사례가 없다.
 
 **④ SFT-원자 / RL-모듈화 관점** ([arXiv:2606.18089](https://arxiv.org/html/2606.18089v2))
-"SFT가 원자적 스킬을 깔고, RL은 그걸 분해·정리할 뿐 새 능력은 못 만든다"는 관점을 우리 실측에
-대입하면 도메인별 예측이 결과와 일치한다: GSM8K·코드는 베이스 SFT(Qwen3 사전학습 + OpenCoder 등)에
-원자가 충분해 RL 향상이 나오고(Run 1: +2.95), 경시 수학(MATH)은 원자가 얇아 RL만으로는 보합(13.6→13.0).
-→ **다음 실험 후보**: 수학 CoT SFT 한 겹 후 JustGRPO를 얹는 *MATH-SFT-then-RL*
-(현 매트릭스 완료 후 착수, 상세는 [ADAPTATION.md](ADAPTATION.md)).
+"SFT가 원자적 스킬을 깔고 RL은 그걸 정리할 뿐 새 능력은 못 만들며, **RL 데이터가 SFT 지원집합
+밖일 때(C_SFT ∩ C_RL = ∅) 일반화가 최강**"이라는 관점을 우리 데이터 관계에 실제로 대입해 검증:
+GSM8K·코드는 원자는 SFT에 있고(RL 데이터는 SFT와 겹치지 않는 새 인스턴스) → 이상적 조건 → RL 향상
+(Run 1: +2.95). 반면 MATH는 RL 데이터가 SFT의 NuminaMath와 **겹치고**, bd3lm SFT의 max_length
+512로 긴 CoT가 잘려 학습된 정황까지 겹쳐 RL만으로는 보합(13.6→13.0).
+→ **다음 실험 후보**: 긴 CoT를 잘리지 않게 넣는 *MATH-longCoT-SFT-then-RL*
+(상세 설계·데이터 겹침 분석은 [ADAPTATION.md](ADAPTATION.md)).
 
 ---
 

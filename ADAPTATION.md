@@ -26,24 +26,27 @@ gen length 256. one-pass 손실은 원본의 256회 forward 루프와 수학적�
 이 논문의 주장: SFT는 원자적 스킬을 얽힌 채 공급하고, RL은 새 능력을 만드는 게 아니라 그것을
 분해·모듈화한다. **SFT에 원자가 없으면 RL은 실패한다.** 우리 셋업에 대입한 결과:
 
-| 도메인 | 원자 존재 증거 (실측) | 논문 예측 | 실제 결과 |
-|---|---|---|---|
-| GSM8K | temp 1.0 rollout 8개 중 5–8개 이미 정답 | 원자 충분 → RL 향상 | Run 1 v1: +2.95 ✅ |
-| 코드 | Run 3 보상 시작부터 0.6–1.0 | 원자 충분 (OpenCoder SFT 포함) → 향상 기대 | v2 진행 중 |
-| MATH | 베이스 13.6%, 정답 rollout 희박 | **원자 얇음 → RL로 못 만듦 → 보합** | Run 1 v1: 13.6→13.0 보합 ✅ |
+핵심 조건까지 반영한 분석 (논문: **RL 데이터가 SFT 지원집합 밖의 새 조합일 때(C_SFT ∩ C_RL = ∅) 일반화 최강**).
+베이스 모델의 SFT 스택([dLLM 논문](https://arxiv.org/html/2602.22661v1)): Qwen3-0.6B 사전학습 +
+[tulu-3-sft-mixture](https://huggingface.co/datasets/allenai/tulu-3-sft-mixture)(Persona MATH 15만 + Persona GSM 5만 등)
++ [smoltalk](https://huggingface.co/datasets/HuggingFaceTB/smoltalk)(**NuminaMath-CoT, MetaMathQA-50k, APIGen 포함**)
++ OpenCoder Python stage1·2. bd3lm SFT는 **max_length 512** (mdlm은 1024).
 
-베이스 모델의 SFT 스택([dLLM 논문](https://arxiv.org/html/2602.22661v1)): Qwen3-0.6B 사전학습
-+ tulu-3 + smoltalk + **OpenCoder Python stage1·2** (10 에폭). 일반 지시·코드 원자는 충분,
-경시 수학 CoT는 얇음 — 위 표의 패턴과 정확히 일치.
+| 도메인 | 원자(SFT 내) | RL 데이터 ∩ SFT | 논문 기준 판정 | 실측 |
+|---|---|---|---|---|
+| GSM8K | ✅ 충분 (GSM 스타일 합성 20만+) | 실제 GSM8K train은 SFT에 없음 → **교집합 ∅, 같은 스킬족의 새 인스턴스** | **이상적 조건** | Run 1 v1: +2.95 ✅ / rollout 8개 중 5–8 정답 |
+| 코드 | ✅ 충분 (OpenCoder·APIGen·Self-OSS) | AceCode-Hard는 SFT에 없는 별개 분포 → **교집합 ∅** | **이상적 조건** | Run 3 보상 시작부터 0.6–1.0 |
+| MATH | ✅ 있음 (NuminaMath CoT) — 단 bd3lm SFT max_length 512로 **긴 CoT가 잘려 학습됐을 가능성** | **교집합 ≠ ∅** (NuminaMath 소스에 MATH train 포함) | 불리: ①0.6B 용량 ②512 잘림 ③RL이 SFT 지원집합 재탕 | Run 1 v1: 13.6→13.0 보합 ✅ |
 
-**결론**: GSM8K·코드 트랙에는 추가 SFT 불필요 (RL이 "정리" 역할만 하면 됨).
-보너스: "RL은 SFT 커버리지 밖의 새 조합에 집중할 때 일반화 최강"이라는 이 논문의 결론은
-믹싱 런의 이론적 근거이기도 함.
+**결론**: GSM8K·코드 트랙은 논문이 말하는 최적 배치(원자는 SFT에, RL은 새 인스턴스에)와 정확히
+일치 — 추가 SFT 불필요. MATH 정체는 "원자 부재"가 아니라 **용량 + SFT 시퀀스 잘림 + 데이터 겹침**의
+복합 원인으로 보는 것이 정확하다. 믹싱 런은 "SFT 밖 새 조합" 조건을 가장 잘 만족하는 트랙.
 
-**📋 다음 실험 (RL 결과 확인 후 결정)**: *MATH-SFT-then-RL* —
-경시 수학 CoT 데이터(예: OpenMathInstruct류)로 SFT 한 겹을 깐 뒤 JustGRPO를 얹어,
-"원자 재주입 → RL 모듈화" 가설이 0.6B diffusion LM에서 MATH 정체(13%)를 깨는지 검증.
-현 매트릭스(단독 vs 믹싱, bd3lm vs mdlm)가 끝난 뒤 착수.
+**📋 다음 실험 (RL 결과 확인 후 결정)**: *MATH-longCoT-SFT-then-RL* —
+단순 수학 SFT 추가가 아니라 **긴 CoT가 잘리지 않는 조건(max_length 1024–2048)으로 SFT 한 겹**
+(NuminaMath/OpenMathInstruct류) 후 JustGRPO를 얹어, "잘린 원자 복원 → RL 모듈화"가
+0.6B diffusion LM의 MATH 정체(13%)를 깨는지 검증. RL 프롬프트는 SFT에 안 쓴 문제로 분리해
+C_SFT ∩ C_RL = ∅ 조건 유지. 현 매트릭스(단독 vs 믹싱, bd3lm vs mdlm) 완료 후 착수.
 
 ## 왜 AR-순서 rollout이 이 모델에서 안 되는가 (모델 선택 가이드)
 
