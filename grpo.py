@@ -56,7 +56,7 @@ def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, t
 
 
 def logprob_loss(model, inputs, valid_samples, eps=0.2, gain=1.0, temperature=1., accelerator=None,
-                 gen_length=256, mask_id=None):
+                 gen_length=256, mask_id=None, eos_id=None):
     advantages, generated_ids, prompt_len = inputs['advantages'], inputs['generated_ids'], inputs['prompt_len']
     prompt_ids, completion_ids = generated_ids[:, :prompt_len], generated_ids[:, prompt_len:]
 
@@ -73,6 +73,16 @@ def logprob_loss(model, inputs, valid_samples, eps=0.2, gain=1.0, temperature=1.
     clipped_ratio = ratio.clamp(1 - eps, 1 + eps)
     adv = advantages.unsqueeze(1)
     loss = -torch.min(ratio * adv, clipped_ratio * adv)
+
+    # Train only up to (and including) the first EOS: the block-diffusion sampler
+    # stops early and sample() pads the tail with EOS tokens the policy never
+    # generated. Reinforcing that artificial padding inflates the marginal EOS
+    # probability and collapses generation into empty responses (observed on the
+    # first mixed run: HumanEval 46.9 -> 18.3 with '<think></think>' + instant EOS).
+    if eos_id is not None:
+        is_eos = completion_ids == eos_id
+        after_first_eos = (is_eos.cumsum(dim=1) - is_eos.int()) > 0
+        loss = loss * (~after_first_eos).float()
 
     accelerator.backward(loss.mul(scale).sum())
 

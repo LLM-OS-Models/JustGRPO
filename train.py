@@ -240,6 +240,7 @@ def train(config: TrainConfig):
                             accelerator=accelerator,
                             gen_length=config.gen_length,
                             mask_id=mask_id,
+                            eos_id=eos_id,
                         )
                         all_rewards.append(inputs['rewards'].detach())
 
