@@ -8,18 +8,20 @@
 - 기술 분석 (하드코딩 제거·설계 결정·논문과의 차이): [ADAPTATION.md](ADAPTATION.md)
 - 벤치마크 결과 원장 (전체 수치): [BENCHMARKS.md](BENCHMARKS.md)
 
-## 📌 현재 상태 (7/25 10:25 갱신)
+## 📌 현재 상태 (7/26 13:25 갱신)
 
-**한눈 요약**: 베이스 재현 완료 → 1차 학습(v1)에서 버그 2건 발견·수정 → 지금은 **수정판(v2)으로
-믹싱·코드 두 런이 동시 학습 중**이며, 내일(7/26) 오전까지 "단독 vs 믹싱" 비교표가 나온다.
+**한눈 요약**: v2(버그 수정판) 매트릭스 진행 중. **코드 단독 RL은 전방위 하락(게이트 실패),
+믹싱은 손상을 대부분 흡수(MATH는 베이스 초과)** — "단독 vs 종합" 비교에서 종합이 확실히 우세.
+결정 트리에 따라 **MDLM(논문 100% 방식) 트랙 가동**, GSM8K 단독 v2도 재실행 중.
 
-| 런 | 데이터 | 시작 | 상태 / 결과 | 다음 행동 |
-|---|---|---|---|---|
-| Run 1 v1 | GSM8K 단독 (200스텝) | 7/24 17:10 | ✅ 완료. **GSM8K 45.72 → 48.67 (+2.95)**, 코드는 하락(간섭+버그 혼재). [HF 모델](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) | v2로 재실행해 정본 확보 (7/26 새벽 시작) |
-| Run 2 v1 | 믹싱 (300스텝) | 7/24 18:35 | ❌ ckpt-200에서 빈 응답 붕괴 → **EOS 패딩 버그 원인 규명** | 폐기 (ablation 보존) |
-| **Run 2 v2** | 믹싱 (300스텝) | **7/25 10:05** | 🔥 학습 중 (스텝 6, 보상 정상) | 종료 7/26 오전 → ckpt-200/300 평가 |
-| **Run 3 v2** | 코드 단독 (200스텝) | **7/25 10:10** | 🔥 학습 중 (스텝 6, 보상 +0.69) | 종료 7/26 새벽 → 평가 → Run 1 v2 투입 |
-| Run 4 | MATH 단독 (200스텝) | 대기 | — | Run 2 v2 종료 후 투입 |
+| 런 | 데이터 (모델) | 상태 / 결과 | 다음 |
+|---|---|---|---|
+| Run 1 v1 | GSM8K 단독 (bd3lm) | ✅ GSM8K 45.72→**48.67 (+2.95)**, 단 EOS버그 혼재 · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) | v2가 정본 |
+| Run 3 v2 | 코드 단독 (bd3lm) | ❌ **게이트 실패**: HumanEval 46.95→23.78, GSM8K −20, MATH −5 (sampler-learner mismatch) · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run3v2-code-lora) | 완료 |
+| Run 2 v2 | **믹싱** (bd3lm) | 🟡 완주. ckpt-300: GSM8K 43.97(−1.8) · HumanEval 40.24(−6.7) · **MATH 13.90(+0.3, ckpt-200)** — 단독 대비 손상 대폭 완화 · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run2v2-mixed-lora) | 잔여 태스크 평가 마무리 |
+| **Run 1 v2** | GSM8K 단독 재실행 (bd3lm) | 🔥 학습 중 138/200, 보상 +0.2–0.75 | 종료 약 16:30 → 평가 |
+| **Run 5** | GSM8K (**MDLM, 논문 100% 방식**) | 🔥 학습 중 11/200 (보상 이미 베이스 기대치 상회) | 손실이 무거워 스텝당 느림 — Run 1 v2 종료 후 가속 |
+| Run 4 | MATH 단독 | 대기 (겹침 분석상 기대치 낮음 — 우선순위 하향) | 슬롯 여유 시 |
 
 **발견·수정한 버그 2건** (둘 다 커밋·문서화·푸시 완료):
 1. 원본 레포 잠복 버그: 코드 채점 샌드박스가 학습 프로세스의 os 모듈 파괴 → Pool worker 격리로 수정 (`8c83aeb`)
