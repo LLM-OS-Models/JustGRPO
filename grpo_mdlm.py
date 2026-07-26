@@ -17,7 +17,8 @@ for BD3LM checkpoints — that is what grpo.py handles.
 import torch
 import torch.nn.functional as F
 
-from utils.generate import generate
+from utils.generate import generate  # original reference (kept for tests/ablation)
+from utils.mdlm_fast import generate_ar_mdlm_fast
 
 
 @torch.no_grad()
@@ -27,10 +28,13 @@ def sample(model, batch, tokenizer, device, reward_fn=None, num_generations=1, t
                                             add_generation_prompt=True, tokenize=False)
     prompt_ids = tokenizer(prompts, return_tensors='pt', padding=True)['input_ids'].to(device)
 
-    # Rollout with AR order (block_length=1), original JustGRPO generate()
-    generated_ids = generate(model=model, prompt=prompt_ids.repeat(num_generations, 1),
-                             steps=steps, gen_length=gen_length, temperature=temperature,
-                             block_length=1, mask_id=mask_id)
+    # Rollout with AR order (block_length=1). generate_ar_mdlm_fast is
+    # compute-identical to the original generate(..., block_length=1) — greedy
+    # outputs verified token-identical — it just skips the vocab projection at
+    # positions whose logits are discarded (~1.5-2x wall-clock).
+    generated_ids = generate_ar_mdlm_fast(model=model, prompt=prompt_ids.repeat(num_generations, 1),
+                                          gen_length=gen_length, temperature=temperature,
+                                          mask_id=mask_id)
 
     # Truncate at EOS before decoding so post-EOS continuation can't confuse the reward
     responses = []
