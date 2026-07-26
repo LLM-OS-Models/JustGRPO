@@ -23,7 +23,12 @@
 | Run 1 v2 | GSM8K 단독 재실행 (bd3lm) | ⏸️ 140/200에서 일시정지 (체크포인트 보존, MDLM에 GPU 양보) | 여유 시 재개/ckpt-140 평가 |
 | **Run 5** | GSM8K 기초 (**MDLM, 논문 100% 방식**) | 🔥 학습 중 (ckpt-20에서 재개) | 종료 후 4태스크 평가 |
 | **Run 6** | **믹싱** (**MDLM**, gsm8k+math+code) | 🔥 학습 중 (7/26 14:05 시작, 300스텝) | ckpt-200/300 평가 → **MDLM 단독 vs 믹싱 비교** |
-| Run 7/8 | MATH(수학응용)·코드 단독 (MDLM) | 대기 | Run 5/6 종료 후 순차 |
+| Run 7 | MATH(수학응용) 단독 (MDLM) | 대기 — [`scripts/run7_mdlm_math500_lora.sh`](scripts/run7_mdlm_math500_lora.sh) 준비 완료 | Run 5 종료 즉시 투입 |
+| Run 8 | 코드 단독 (MDLM) | 대기 — [`scripts/run8_mdlm_code_lora.sh`](scripts/run8_mdlm_code_lora.sh) 준비 완료 | Run 6 종료 즉시 투입 |
+
+**자동 연쇄**: 각 런 종료 알림 → 즉시 병합 → 4태스크 평가([`scripts/eval_mdlm_ckpt.sh`](scripts/eval_mdlm_ckpt.sh))
+→ HF 업로드 → 다음 런 투입 → 결과를 BENCHMARKS/README에 기록·푸시. MDLM 예상 일정
+(스텝당 8–12분 추정, 실측 후 갱신): Run 5 **7/27 오후–밤**, Run 6 **7/28 오전–낮**, Run 7/8은 각 종료 후 이어짐.
 
 **발견·수정한 버그 2건** (둘 다 커밋·문서화·푸시 완료):
 1. 원본 레포 잠복 버그: 코드 채점 샌드박스가 학습 프로세스의 os 모듈 파괴 → Pool worker 격리로 수정 (`8c83aeb`)
