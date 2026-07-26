@@ -8,20 +8,22 @@
 - 기술 분석 (하드코딩 제거·설계 결정·논문과의 차이): [ADAPTATION.md](ADAPTATION.md)
 - 벤치마크 결과 원장 (전체 수치): [BENCHMARKS.md](BENCHMARKS.md)
 
-## 📌 현재 상태 (7/26 13:25 갱신)
+## 📌 현재 상태 (7/26 14:05 갱신) — 🔄 **주 무대를 MDLM으로 전환**
 
-**한눈 요약**: v2(버그 수정판) 매트릭스 진행 중. **코드 단독 RL은 전방위 하락(게이트 실패),
-믹싱은 손상을 대부분 흡수(MATH는 베이스 초과)** — "단독 vs 종합" 비교에서 종합이 확실히 우세.
-결정 트리에 따라 **MDLM(논문 100% 방식) 트랙 가동**, GSM8K 단독 v2도 재실행 중.
+**한눈 요약**: bd3lm 매트릭스에서 "AR-손실 × 블록확산 생성"의 구조적 불일치를 확인
+(코드 단독 전방위 하락, 믹싱은 손상 흡수하나 순이득 없음). **본 목표(단독 vs 믹싱)를
+논문 100% 방식이 성립하는 MDLM 쌍둥이 모델에서 재수행하기로 결정 (7/26 14시)** —
+현재 MDLM-수학기초(GSM8K)와 MDLM-믹싱이 동시 학습 중. 이후 수학응용(MATH)·코드 단독 순.
 
 | 런 | 데이터 (모델) | 상태 / 결과 | 다음 |
 |---|---|---|---|
 | Run 1 v1 | GSM8K 단독 (bd3lm) | ✅ GSM8K 45.72→**48.67 (+2.95)**, 단 EOS버그 혼재 · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run1-gsm8k-lora) | v2가 정본 |
 | Run 3 v2 | 코드 단독 (bd3lm) | ❌ **게이트 실패**: HumanEval 46.95→23.78, GSM8K −20, MATH −5 (sampler-learner mismatch) · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run3v2-code-lora) | 완료 |
 | Run 2 v2 | **믹싱** (bd3lm) | 🟡 완주. ckpt-300: GSM8K 43.97(−1.8) · HumanEval 40.24(−6.7) · **MATH 13.90(+0.3, ckpt-200)** — 단독 대비 손상 대폭 완화 · [HF](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-bd3lm-justgrpo-run2v2-mixed-lora) | 잔여 태스크 평가 마무리 |
-| **Run 1 v2** | GSM8K 단독 재실행 (bd3lm) | 🔥 학습 중 138/200, 보상 +0.2–0.75 | 종료 약 16:30 → 평가 |
-| **Run 5** | GSM8K (**MDLM, 논문 100% 방식**) | 🔥 학습 중 11/200 (보상 이미 베이스 기대치 상회) | 손실이 무거워 스텝당 느림 — Run 1 v2 종료 후 가속 |
-| Run 4 | MATH 단독 | 대기 (겹침 분석상 기대치 낮음 — 우선순위 하향) | 슬롯 여유 시 |
+| Run 1 v2 | GSM8K 단독 재실행 (bd3lm) | ⏸️ 140/200에서 일시정지 (체크포인트 보존, MDLM에 GPU 양보) | 여유 시 재개/ckpt-140 평가 |
+| **Run 5** | GSM8K 기초 (**MDLM, 논문 100% 방식**) | 🔥 학습 중 (ckpt-20에서 재개) | 종료 후 4태스크 평가 |
+| **Run 6** | **믹싱** (**MDLM**, gsm8k+math+code) | 🔥 학습 중 (7/26 14:05 시작, 300스텝) | ckpt-200/300 평가 → **MDLM 단독 vs 믹싱 비교** |
+| Run 7/8 | MATH(수학응용)·코드 단독 (MDLM) | 대기 | Run 5/6 종료 후 순차 |
 
 **발견·수정한 버그 2건** (둘 다 커밋·문서화·푸시 완료):
 1. 원본 레포 잠복 버그: 코드 채점 샌드박스가 학습 프로세스의 os 모듈 파괴 → Pool worker 격리로 수정 (`8c83aeb`)
