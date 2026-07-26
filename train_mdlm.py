@@ -269,6 +269,9 @@ def parse_args():
     parser.add_argument("--lora", action="store_true", help="Train LoRA adapters instead of full finetuning")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate (default: 5e-5 with --lora, 5e-6 otherwise)")
     parser.add_argument("--loss_chunk", type=int, default=4, help="t-positions batched per loss forward")
+    parser.add_argument("--num_generations", type=int, default=8, help="rollouts per sample() call")
+    parser.add_argument("--repeat_times", type=int, default=2,
+                        help="sample() calls per prompt (group size = num_generations x repeat_times)")
 
     return parser.parse_args()
 
@@ -286,6 +289,8 @@ if __name__ == "__main__":
         code_data_path=args.code_data_path,
         lora=args.lora,
         loss_chunk=args.loss_chunk,
+        num_generations=args.num_generations,
+        repeat_times=args.repeat_times,
         learning_rate=args.lr if args.lr is not None else (5e-5 if args.lora else 5e-6),
     )
 
