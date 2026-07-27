@@ -114,6 +114,7 @@ def main():
     ap.add_argument("--adapter", required=True)
     ap.add_argument("--merged", default=None)
     ap.add_argument("--steps", default="200")
+    ap.add_argument("--family", default="bd3lm", choices=["bd3lm", "mdlm"], help="base model family for repo naming/card")
     ap.add_argument("--results", default="Evaluation in progress — see the GitHub repo's BENCHMARKS.md for the live table.")
     args = ap.parse_args()
 
@@ -134,7 +135,10 @@ def main():
         api.upload_folder(repo_id=repo_id, folder_path=folder)
         print(f"uploaded -> https://huggingface.co/{repo_id}")
 
-    base_name = f"Qwen3-0.6B-diffusion-bd3lm-justgrpo-{args.run}"
+    global BASE
+    if args.family == "mdlm":
+        BASE = "dllm-hub/Qwen3-0.6B-diffusion-mdlm-v0.1"
+    base_name = f"Qwen3-0.6B-diffusion-{args.family}-justgrpo-{args.run}"
     push(f"{base_name}-adapter", args.adapter, "the LoRA adapter only (load onto the base model with PEFT)")
     if args.merged:
         push(base_name, args.merged, "the merged full model (base + LoRA)")

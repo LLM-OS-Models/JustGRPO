@@ -12,6 +12,8 @@ accelerate launch --num_processes 1 train_mdlm.py \
   --grad_accum 8 \
   --lora \
   --total_steps 300 \
-  --loss_chunk 1 \
+  --loss_chunk 2 \
+  --num_generations 16 \
+  --repeat_times 1 \
   --run_dir "$RUNS_DIR/run6-mdlm-mixed-lora" \
   2>&1 | tee -a "$RUNS_DIR/run6-mdlm-mixed-lora-train.log"
