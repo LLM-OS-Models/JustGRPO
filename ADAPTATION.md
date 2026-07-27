@@ -116,3 +116,22 @@ C_SFT ∩ C_RL = ∅ 조건 유지. 현 매트릭스(단독 vs 믹싱, bd3lm vs 
 ## 베이스라인 성능
 
 [BENCHMARKS.md](BENCHMARKS.md) 참고 — dLLM 논문 수치와의 재현 비교.
+
+## 후속 트랙 조사: diffu-GRPO로 bd3lm 베이스(46.6) 넘기 (7/27)
+
+**문제**: JustGRPO(AR 방식)는 강한 bd3lm 베이스와 호환되지 않아(mismatch 붕괴), mdlm에서만 작동하는데
+mdlm 베이스(29.8)가 너무 낮아 RL 성공(34.7)해도 bd3lm 베이스(46.6)를 못 넘는다.
+
+**후보 해법**: 확산-네이티브 GRPO = [diffu-GRPO/d1](https://github.com/dllm-reasoning/d1).
+AR로 억지 변환하지 않고 블록 확산 rollout + 확산 일관 손실 → mismatch 원천 제거.
+강한 bd3lm 베이스를 유지한 채 RL 가능 → 46.6을 실제로 넘길 유일한 경로.
+
+**조사 결과 (dllm 레포 `examples/rl`)**:
+- `dllm/pipelines/rl/grpo/`에 `DiffuGRPOTrainer` 구현 존재 (d1/diffu-grpo 참조 구현)
+- 제공 예제: `examples/rl/grpo/llada/train.py` (LLaDA), `examples/rl/grpo/a2d/mdlm/train.py` (Tiny-A2D MDLM)
+- **bd3lm(블록 확산) 전용 예제는 없음** → 블록 인과 attention·블록 스케줄에 맞춘 적용 필요 (MDLM 예제를 베이스로 개조)
+- 이 방법은 JustGRPO가 명시적으로 피한 "diffusion-specific adaptation"에 해당 — 즉 별개 방법론의 비교 실험이 됨
+
+**우선순위**: 현재 mdlm 매트릭스(JustGRPO 방법론 검증) 완주 후 착수. "JustGRPO on mdlm" vs
+"diffu-GRPO on bd3lm"의 비교 자체가 논문급 질문 — 전자는 방법이 단순하나 약한 베이스,
+후자는 방법이 복잡하나 강한 베이스. 어느 쪽이 최종 성능에서 이기는지가 핵심.
