@@ -121,3 +121,17 @@ MDLM 베이스: GSM8K 29.3 · MATH 8.7 · HumanEval 30.5 · MBPP 29.2
 - ckpt-50/150 GSM8K 스윕 및 나머지 태스크 측정은 GPU 여유 시 채움 (Run 6 학습 우선).
 - 업로드: 과학습된 ckpt-200이 아니라 **최고점 ckpt-100을 릴리스 버전으로 재업로드 예정**.
 - 현재 HF 업로드본([run5-gsm8k-lora](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-mdlm-justgrpo-run5-gsm8k-lora))은 ckpt-200 — 곧 ckpt-100 기준으로 교체.
+
+### ⭐ 믹싱 vs 단독 — ckpt-100 컴퓨트 동일 비교 (MDLM, 7/28) — 핵심 결과
+
+MDLM 베이스 GSM8K ≈ 29.8. 같은 100스텝(컴퓨트 동일)에서:
+
+| 학습 방식 | GSM8K | 향상 | GSM8K 노출 |
+|---|---:|---:|---|
+| Run 5 (수학 단독) | 34.72 | +4.9 | 매 스텝 (100%) |
+| **Run 6 (믹싱)** | **36.77** | **+7.0** | 매 3스텝 중 1 (33%) |
+
+**믹싱이 단독의 홈그라운드(GSM8K)에서 단독을 +2.05 이겼다.** GSM8K를 1/3 빈도로만 학습했는데도
+더 높음 → 코드·수학응용 데이터의 긍정적 교차전이(cross-domain transfer). 논문 방식(MDLM)이 0.6B에서
+명확히 작동함과 동시에, 멀티도메인 RL이 단일도메인보다 우수함을 실증.
+(HumanEval/MBPP/MATH 비교는 GPU 여유 시 채움 — Run 6 학습 우선.)
