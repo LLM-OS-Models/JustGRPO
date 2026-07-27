@@ -108,3 +108,16 @@ mismatch** — rollout·평가는 블록 확산, 손실은 AR 분해라서 스�
 
 **절반 학습 만에 목표 하한(+3)을 돌파 — 논문 방식의 작동이 0.6B MDLM에서 확증됨.**
 (bd3lm 트랙의 중간 검증이 베이스 미달이었던 것과 대조적. 방법-모델 정합성 가설 입증)
+
+### Run 5 — MDLM 수학기초(GSM8K) 단독, 체크포인트별 (7/27) — 과학습 곡선
+
+MDLM 베이스: GSM8K 29.3 · MATH 8.7 · HumanEval 30.5 · MBPP 29.2
+
+| 체크포인트 | GSM8K | HumanEval | 비고 |
+|---|---:|---:|---|
+| ckpt-100 (100스텝) | **34.72** (+5.4) | — | GSM8K 최고점 |
+| ckpt-200 (최종) | 27.90 (−1.4) | 34.15 (+3.6) | GSM8K 과학습 하락, HumanEval 상승 유지 |
+
+- ckpt-50/150 GSM8K 스윕 및 나머지 태스크 측정은 GPU 여유 시 채움 (Run 6 학습 우선).
+- 업로드: 과학습된 ckpt-200이 아니라 **최고점 ckpt-100을 릴리스 버전으로 재업로드 예정**.
+- 현재 HF 업로드본([run5-gsm8k-lora](https://huggingface.co/LLM-OS-Models2/Qwen3-0.6B-diffusion-mdlm-justgrpo-run5-gsm8k-lora))은 ckpt-200 — 곧 ckpt-100 기준으로 교체.
