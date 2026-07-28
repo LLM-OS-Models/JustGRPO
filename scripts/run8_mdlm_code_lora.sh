@@ -10,6 +10,10 @@ accelerate launch --num_processes 1 train_mdlm.py \
   --code_data_path datasets/acecode_hard.jsonl \
   --grad_accum 8 \
   --lora \
-  --total_steps 200 \
+  --total_steps 150 \
+  --save_every 50 \
+  --num_generations 16 \
+  --repeat_times 1 \
+  --loss_chunk 2 \
   --run_dir "$RUNS_DIR/run8-mdlm-code-lora" \
   2>&1 | tee -a "$RUNS_DIR/run8-mdlm-code-lora-train.log"
